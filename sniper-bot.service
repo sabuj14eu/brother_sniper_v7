@@ -1,0 +1,28 @@
+[Unit]
+Description=Brother Sniper Bot v7
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=shyam
+Group=shyam
+WorkingDirectory=/home/shyam/brother_sniper_v7
+EnvironmentFile=/home/shyam/brother_sniper_v7/.env
+
+ExecStart=/home/shyam/brother_sniper_v7/venv/bin/gunicorn \
+    -c gunicorn.conf.py \
+    bot:app
+
+Restart=always
+RestartSec=10
+StartLimitInterval=120
+StartLimitBurst=5
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/home/shyam/brother_sniper_v7
+
+[Install]
+WantedBy=multi-user.target

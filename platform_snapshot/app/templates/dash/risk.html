@@ -1,0 +1,46 @@
+{% extends "dash/_base.html" %}
+{% block content %}
+<h1 class="text-2xl font-bold text-white mb-6">Risk Manager</h1>
+
+{% if r.emergency_stop %}
+<div class="bg-rose-500/10 border border-rose-500/50 rounded-2xl p-6 mb-6 flex items-center justify-between">
+  <div>
+    <div class="text-rose-300 font-bold text-lg">🛑 EMERGENCY STOP IS ACTIVE</div>
+    <div class="text-sm text-rose-400/80">All trading halted{% if r.emergency_stop_at %} since {{ r.emergency_stop_at.strftime('%Y-%m-%d %H:%M') }} UTC{% endif %}.</div>
+  </div>
+  <form method="post" action="/risk/resume" onsubmit="return confirm('Resume trading?')">
+    <button class="border border-rose-400 text-rose-300 hover:bg-rose-500/20 px-5 py-2 rounded-xl font-semibold">Resume trading</button>
+  </form>
+</div>
+{% else %}
+<div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 mb-6 flex items-center justify-between">
+  <div>
+    <div class="font-bold text-white text-lg">One-click emergency stop</div>
+    <div class="text-sm text-slate-500">Instantly halts all bot trading on every account. Audited.</div>
+  </div>
+  <form method="post" action="/risk/emergency-stop" onsubmit="return confirm('STOP ALL TRADING now?')">
+    <button class="bg-rose-600 hover:bg-rose-500 text-white font-bold px-6 py-3 rounded-xl">🛑 STOP TRADING</button>
+  </form>
+</div>
+{% endif %}
+
+<form method="post" action="/risk/save" class="bg-slate-900 border border-slate-800 rounded-xl p-5 max-w-2xl">
+  <h3 class="font-semibold text-white mb-4">Limits</h3>
+  <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
+    {% for name, label, value, step in [
+      ('daily_loss_limit','Daily loss limit %', r.daily_loss_limit, '0.1'),
+      ('weekly_loss_limit','Weekly loss limit %', r.weekly_loss_limit, '0.1'),
+      ('monthly_loss_limit','Monthly loss limit %', r.monthly_loss_limit, '0.1'),
+      ('max_consecutive_losses','Max consecutive losses', r.max_consecutive_losses, '1'),
+      ('max_exposure','Max exposure % of equity', r.max_exposure, '0.5'),
+      ('max_lots','Max total lots', r.max_lots, '0.01'),
+    ] %}
+    <label class="block"><span class="text-xs text-slate-400">{{ label }}</span>
+      <input name="{{ name }}" type="number" step="{{ step }}" value="{{ value }}" required
+             class="mt-1 w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm"></label>
+    {% endfor %}
+  </div>
+  <button class="mt-4 bg-brand hover:bg-brand-dark text-slate-950 font-bold px-5 py-2 rounded-xl">Save limits</button>
+  <p class="text-xs text-slate-500 mt-3">Risk is never widened silently — every change is written to the audit log.</p>
+</form>
+{% endblock %}

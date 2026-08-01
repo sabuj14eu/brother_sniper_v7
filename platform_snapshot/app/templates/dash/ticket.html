@@ -1,0 +1,19 @@
+{% extends "dash/_base.html" %}
+{% from "_macros.html" import status_badge %}
+{% block content %}
+<a href="/support" class="text-sm text-brand">← Support</a>
+<h1 class="text-2xl font-bold text-white mt-2 mb-1">{{ ticket.subject }} {{ status_badge(ticket.status) }}</h1>
+<p class="text-sm text-slate-500 mb-6">{{ ticket.category|replace('_',' ') }} · opened {{ ticket.created_at.strftime('%Y-%m-%d %H:%M') }}</p>
+<div class="space-y-4 max-w-3xl">
+{% for m in ticket.messages %}
+<div class="bg-slate-900 border {{ 'border-amber-500/40' if m.is_staff else 'border-slate-800' }} rounded-xl p-4">
+  <div class="text-xs text-slate-500 mb-1">{{ 'Support team' if m.is_staff else 'You' }} · {{ m.created_at.strftime('%Y-%m-%d %H:%M') }}</div>
+  <p class="text-sm whitespace-pre-line">{{ m.body }}</p>
+</div>
+{% endfor %}
+<form method="post" action="/support/{{ ticket.id }}/reply" class="bg-slate-900 border border-slate-800 rounded-xl p-4">
+  <textarea name="body" rows="3" required placeholder="Reply…" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm"></textarea>
+  <button class="mt-2 bg-brand hover:bg-brand-dark text-slate-950 font-bold px-5 py-2 rounded-xl">Send reply</button>
+</form>
+</div>
+{% endblock %}

@@ -1,0 +1,26 @@
+{% extends "admin/_base.html" %}
+{% from "_macros.html" import badge, pagination %}
+{% block content %}
+<h1 class="text-2xl font-bold text-white mb-6">Users <span class="text-sm text-slate-500 font-normal">({{ total }})</span></h1>
+<form class="mb-4 flex gap-2">
+  <input name="q" value="{{ q }}" placeholder="Search phone / name / email"
+         class="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm w-72">
+  <button class="bg-slate-700 hover:bg-slate-600 rounded-lg px-4 text-sm">Search</button>
+</form>
+<div class="bg-slate-900 border border-slate-800 rounded-xl overflow-x-auto">
+<table class="data w-full">
+<tr><th>ID</th><th>Phone</th><th>Name</th><th>Country</th><th>Role</th><th>KYC</th><th>Status</th><th>Joined</th></tr>
+{% for u in rows %}
+<tr class="cursor-pointer" onclick="location='/admin/users/{{ u.id }}'">
+  <td>{{ u.id }}</td><td class="font-mono">{{ u.primary_contact }}</td><td>{{ u.name }}</td><td>{{ u.country }}</td>
+  <td>{{ badge(u.role, 'yellow' if u.is_admin else 'slate') }}</td><td>{{ u.kyc_status }}</td>
+  <td>{% if u.is_banned %}{{ badge('banned','red') }}{% elif u.is_suspended %}{{ badge('suspended','yellow') }}
+      {% else %}{{ badge('active','green') }}{% endif %}
+      {% if not u.is_verified %}{{ badge('unverified','slate') }}{% endif %}</td>
+  <td>{{ u.created_at.strftime('%Y-%m-%d') }}</td>
+</tr>
+{% endfor %}
+</table>
+</div>
+{{ pagination(page, pages, '/admin/users?q=' ~ q ~ '&') }}
+{% endblock %}

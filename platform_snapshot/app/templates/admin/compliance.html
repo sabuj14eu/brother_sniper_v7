@@ -1,0 +1,39 @@
+{% extends "admin/_base.html" %}
+{% from "_macros.html" import stat, badge %}
+{% block content %}
+<h1 class="text-2xl font-bold text-white mb-6">Compliance</h1>
+<div class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
+  {% for doc in ['terms','privacy','risk','cookies','gdpr'] %}
+  {{ stat(doc|title ~ ' consents', counts.get(doc, 0)) }}
+  {% endfor %}
+</div>
+<div class="grid lg:grid-cols-2 gap-6">
+<div>
+  <h3 class="font-semibold text-white mb-3">Legal documents (edit in CMS with slug <code class="text-xs bg-slate-800 px-1 rounded">legal-*</code>)</h3>
+  <div class="bg-slate-900 border border-slate-800 rounded-xl p-4">
+    {% for p in legal_posts %}
+    <div class="flex justify-between items-center border-b border-slate-800 py-2 text-sm">
+      <span>{{ p.title }}</span>
+      {{ badge('published','green') if p.published else badge('draft','yellow') }}
+    </div>
+    {% else %}
+    <p class="text-slate-500 text-sm">No legal documents in CMS yet — built-in defaults are being served.
+      Create posts with slugs <code>legal-terms</code>, <code>legal-privacy</code>, <code>legal-risk-disclaimer</code>,
+      <code>legal-cookies</code>, <code>legal-gdpr</code>.</p>
+    {% endfor %}
+  </div>
+</div>
+<div>
+  <h3 class="font-semibold text-white mb-3">Recent consent log</h3>
+  <div class="bg-slate-900 border border-slate-800 rounded-xl overflow-x-auto">
+  <table class="data w-full">
+  <tr><th>Time</th><th>User</th><th>Document</th><th>Version</th><th>IP</th></tr>
+  {% for c in consents %}
+  <tr><td>{{ c.accepted_at.strftime('%Y-%m-%d %H:%M') }}</td><td>#{{ c.user_id }}</td>
+    <td>{{ c.document }}</td><td>{{ c.version }}</td><td>{{ c.ip }}</td></tr>
+  {% endfor %}
+  </table>
+  </div>
+</div>
+</div>
+{% endblock %}

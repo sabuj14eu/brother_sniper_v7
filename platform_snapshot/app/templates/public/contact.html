@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% from "_macros.html" import field %}
+{% block title %}Contact — {{ app_name }}{% endblock %}
+{% block content %}
+<div class="max-w-xl mx-auto px-4 py-16">
+<h1 class="text-4xl font-extrabold text-white mb-8">Contact us</h1>
+{% if sent %}
+<div class="bg-emerald-500/10 border border-emerald-500/40 text-emerald-300 rounded-xl p-4 mb-6">
+  Message received — we'll get back to you shortly.</div>
+{% endif %}
+<form method="post" class="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+  {{ field('name', 'Your name') }}
+  {{ field('email', 'Email', type='email') }}
+  <label class="block mb-4"><span class="text-sm text-slate-400">Message</span>
+    <textarea name="message" required rows="5"
+      class="mt-1 w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none"></textarea>
+  </label>
+  <button class="bg-brand hover:bg-brand-dark text-slate-950 font-bold px-6 py-2 rounded-xl">Send</button>
+</form>
+</div>
+{% endblock %}

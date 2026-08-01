@@ -1,0 +1,24 @@
+{% extends "dash/_base.html" %}
+{% block content %}
+<h1 class="text-2xl font-bold text-white mb-6">Downloads</h1>
+<div class="grid md:grid-cols-2 gap-4 max-w-4xl">
+  {% for icon, title, desc, ready in [
+    ('🖥️','MetaTrader 5','Download MT5 from your broker and log in with your account.', True),
+    ('🪟','Windows Executor','NSSM-managed service that connects MT5 to the platform and reports heartbeats.', True),
+    ('🐧','Linux Agent','Headless VPS agent: CPU/RAM/disk/latency heartbeats via your API key.', True),
+    ('📱','Mobile App','iOS & Android app.', False),
+    ('📊','TradingView Indicator','BrotherSniper Pine indicator — invite is sent to your TradingView username.', True),
+    ('📕','PDF Manual','Full setup and operations manual.', True),
+  ] %}
+  <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 flex items-start gap-4">
+    <div class="text-3xl">{{ icon }}</div>
+    <div class="flex-1"><div class="font-bold text-white">{{ title }}</div>
+      <p class="text-sm text-slate-400 mt-1">{{ desc }}</p></div>
+    {% if ready %}
+    <a href="/support" class="text-xs bg-slate-800 hover:bg-slate-700 rounded-lg px-3 py-1.5">Request link</a>
+    {% else %}<span class="text-xs text-slate-500 border border-slate-700 rounded px-2 py-1">Coming soon</span>{% endif %}
+  </div>
+  {% endfor %}
+</div>
+<p class="text-sm text-slate-500 mt-6">Download artifacts are delivered per-subscription via support to keep executor builds versioned per user.</p>
+{% endblock %}

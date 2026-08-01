@@ -1,0 +1,65 @@
+{% extends "admin/_base.html" %}
+{% from "_macros.html" import stat, status_badge, pnl %}
+{% block content %}
+<h1 class="text-2xl font-bold text-white mb-6">Finance</h1>
+<div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+  {{ stat('Total revenue', revenue|money, tone='good') }}
+  {% for name, count in subs_by_plan %}{{ stat(name ~ ' subs', count) }}{% endfor %}
+</div>
+
+{% if pending_withdrawals %}
+<h3 class="font-semibold text-white mb-3">Pending withdrawals ({{ pending_withdrawals|length }})</h3>
+<div class="bg-slate-900 border border-amber-500/30 rounded-xl overflow-x-auto mb-8">
+<table class="data w-full">
+<tr><th>Date</th><th>User</th><th>Amount</th><th>Actions</th></tr>
+{% for t in pending_withdrawals %}
+<tr><td>{{ t.created_at.strftime('%Y-%m-%d %H:%M') }}</td><td>#{{ t.user_id }}</td>
+  <td>{{ pnl(t.amount) }}</td>
+  <td class="flex gap-2">
+    <form method="post" action="/admin/finance/withdrawals/{{ t.id }}/approve">
+      <button class="text-xs bg-emerald-500/20 text-emerald-400 rounded px-3 py-1">Approve</button></form>
+    <form method="post" action="/admin/finance/withdrawals/{{ t.id }}/reject">
+      <button class="text-xs bg-rose-500/20 text-rose-400 rounded px-3 py-1">Reject</button></form>
+  </td></tr>
+{% endfor %}
+</table>
+</div>
+{% endif %}
+
+<div class="grid lg:grid-cols-2 gap-6">
+<div>
+  <h3 class="font-semibold text-white mb-3">Recent invoices</h3>
+  <div class="bg-slate-900 border border-slate-800 rounded-xl overflow-x-auto">
+  <table class="data w-full">
+  <tr><th>Number</th><th>User</th><th>Amount</th><th>Status</th><th>Date</th></tr>
+  {% for i in invoices %}
+  <tr><td class="font-mono text-xs">{{ i.number }}</td><td>#{{ i.user_id }}</td>
+    <td>{{ i.amount|money }}</td><td>{{ status_badge(i.status) }}</td>
+    <td>{{ i.created_at.strftime('%Y-%m-%d') }}</td></tr>
+  {% endfor %}
+  </table>
+  </div>
+</div>
+<div>
+  <h3 class="font-semibold text-white mb-3">Affiliate payouts</h3>
+  <div class="bg-slate-900 border border-slate-800 rounded-xl overflow-x-auto">
+  <table class="data w-full">
+  <tr><th>Date</th><th>Affiliate</th><th>Amount</th><th>Reference</th></tr>
+  {% for p in payouts %}
+  <tr><td>{{ p.created_at.strftime('%Y-%m-%d') }}</td><td>#{{ p.user_id }}</td>
+    <td>{{ pnl(p.amount) }}</td><td class="text-xs">{{ p.reference }}</td></tr>
+  {% else %}<tr><td colspan="4" class="text-center text-slate-500 py-6">No payouts yet.</td></tr>{% endfor %}
+  </table>
+  </div>
+  {% if monthly %}
+  <h3 class="font-semibold text-white mt-6 mb-3">Revenue by month</h3>
+  <div class="bg-slate-900 border border-slate-800 rounded-xl p-4">
+    {% for m, amt in monthly %}
+    <div class="flex justify-between text-sm border-b border-slate-800 py-1.5">
+      <span>{{ m }}</span><span class="font-semibold">{{ amt|money }}</span></div>
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>
+</div>
+{% endblock %}

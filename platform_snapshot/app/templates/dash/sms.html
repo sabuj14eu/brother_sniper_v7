@@ -1,0 +1,22 @@
+{% extends "dash/_base.html" %}
+{% from "_macros.html" import toggle, badge %}
+{% block content %}
+<h1 class="text-2xl font-bold text-white mb-1">SMS
+  {{ badge('phone verified' if user.phone_verified else 'no verified phone', 'green' if user.phone_verified else 'slate') }}</h1>
+{% if user.phone %}
+<p class="text-sm text-slate-500 mb-6">SMS goes to {{ user.phone }}. Security codes are always delivered regardless of these settings.</p>
+{% else %}
+<p class="text-sm text-slate-500 mb-6">No phone number on file — add one in your <a class="text-brand" href="/profile">profile</a> to receive SMS alerts. Verification and recovery work by email.</p>
+{% endif %}
+<div class="bg-slate-900 border border-slate-800 rounded-xl p-5 max-w-lg">
+  <form method="post" action="/sms/save">
+    {{ toggle('sms_enabled', prefs.sms_enabled if prefs else True, 'SMS notifications enabled') }}
+    <hr class="border-slate-800 my-3">
+    {{ toggle('sms_trade_alerts', prefs.sms_trade_alerts if prefs else False, 'Trade alerts (entries & exits)') }}
+    {{ toggle('sms_security_alerts', prefs.sms_security_alerts if prefs else True, 'Security alerts') }}
+    {{ toggle('sms_login_alerts', prefs.sms_login_alerts if prefs else False, 'Login alerts') }}
+    {{ toggle('sms_subscription_reminders', prefs.sms_subscription_reminders if prefs else True, 'Subscription reminders') }}
+    <button class="mt-4 bg-brand hover:bg-brand-dark text-slate-950 font-bold px-5 py-2 rounded-xl">Save</button>
+  </form>
+</div>
+{% endblock %}

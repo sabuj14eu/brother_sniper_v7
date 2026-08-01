@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Downloads — {{ app_name }}{% endblock %}
+{% block content %}
+<div class="max-w-4xl mx-auto px-4 py-16">
+<h1 class="text-4xl font-extrabold text-white mb-10">Downloads</h1>
+<div class="grid md:grid-cols-2 gap-4">
+  {% for icon, title, desc in [
+    ('🖥️','MetaTrader 5', 'Official MT5 terminal from your broker.'),
+    ('🪟','Windows Executor', 'Runs on your VPS and reports account heartbeats to the platform.'),
+    ('🐧','Linux Agent', 'Headless agent for VPS monitoring and reporting.'),
+    ('📱','Mobile App', 'iOS & Android — coming soon.'),
+    ('📊','TradingView Indicator', 'The BrotherSniper Pine indicator (invite-only).'),
+    ('📕','PDF Manual', 'Full setup and operations manual.'),
+  ] %}
+  <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 flex items-start gap-4">
+    <div class="text-3xl">{{ icon }}</div>
+    <div class="flex-1"><div class="font-bold text-white">{{ title }}</div>
+      <p class="text-sm text-slate-400">{{ desc }}</p></div>
+    <span class="text-xs text-slate-500 border border-slate-700 rounded px-2 py-1">Login required</span>
+  </div>
+  {% endfor %}
+</div>
+<p class="text-sm text-slate-500 mt-6">Download links are provisioned per subscription in the <a class="text-brand" href="/downloads/app">member area</a>.</p>
+</div>
+{% endblock %}

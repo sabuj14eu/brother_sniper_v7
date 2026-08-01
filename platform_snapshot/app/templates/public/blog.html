@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Blog — {{ app_name }}{% endblock %}
+{% block content %}
+<div class="max-w-4xl mx-auto px-4 py-16">
+<h1 class="text-4xl font-extrabold text-white mb-10">Blog & News</h1>
+{% for p in posts %}
+<a href="/blog/{{ p.slug }}" class="block bg-slate-900 border border-slate-800 rounded-xl p-6 mb-4 hover:border-slate-600">
+  <div class="text-xs text-slate-500">{{ p.created_at.strftime('%Y-%m-%d') }} · {{ p.type }}</div>
+  <h2 class="font-bold text-white text-xl mt-1">{{ p.title }}</h2>
+  <p class="text-sm text-slate-400 mt-2">{{ p.body[:220] }}…</p>
+</a>
+{% else %}
+<p class="text-slate-500">No posts yet.</p>
+{% endfor %}
+</div>
+{% endblock %}

@@ -1,0 +1,68 @@
+{% extends "dash/_base.html" %}
+{% from "_macros.html" import field, badge %}
+{% block content %}
+<h1 class="text-2xl font-bold text-white mb-6">Security</h1>
+{% if msg %}<div class="bg-sky-500/10 border border-sky-500/30 text-sky-300 rounded-xl p-3 mb-4 text-sm">{{ msg }}</div>{% endif %}
+<div class="grid lg:grid-cols-2 gap-6">
+<div class="space-y-6">
+  <div class="bg-slate-900 border border-slate-800 rounded-xl p-5">
+    <h3 class="font-semibold text-white mb-4">Change password</h3>
+    <form method="post" action="/security/password">
+      {{ field('current_password', 'Current password', type='password', required=True) }}
+      {{ field('new_password', 'New password (min 8 chars)', type='password', required=True) }}
+      <button class="bg-brand hover:bg-brand-dark text-slate-950 font-bold px-5 py-2 rounded-xl">Change</button>
+    </form>
+  </div>
+
+  <div class="bg-slate-900 border border-slate-800 rounded-xl p-5">
+    <h3 class="font-semibold text-white mb-2">Two-factor authentication
+      {{ badge('enabled' if user.totp_enabled else 'disabled', 'green' if user.totp_enabled else 'slate') }}</h3>
+    <p class="text-sm text-slate-500 mb-4">Phone OTP secures registration and resets; add Google Authenticator for logins.</p>
+    {% if pending_secret %}
+      <div class="bg-slate-800 rounded-lg p-3 mb-3 text-sm">
+        <div class="text-slate-400 mb-1">1. Add this secret to Google Authenticator:</div>
+        <code class="break-all">{{ pending_secret }}</code>
+        <div class="text-xs text-slate-500 mt-1 break-all">{{ pending_uri }}</div>
+      </div>
+      <form method="post" action="/security/2fa/confirm" class="flex gap-2">
+        <input type="hidden" name="secret" value="{{ pending_secret }}">
+        <input name="code" placeholder="123456" required class="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm w-32">
+        <button class="bg-brand text-slate-950 font-bold px-4 rounded-lg text-sm">Confirm & enable</button>
+      </form>
+    {% elif user.totp_enabled %}
+      <form method="post" action="/security/2fa/disable" class="flex gap-2">
+        <input name="code" placeholder="2FA code" required class="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm w-32">
+        <button class="border border-rose-500/50 text-rose-400 px-4 rounded-lg text-sm">Disable 2FA</button>
+      </form>
+    {% else %}
+      <form method="post" action="/security/2fa/start">
+        <button class="bg-brand hover:bg-brand-dark text-slate-950 font-bold px-5 py-2 rounded-xl">Enable Google Authenticator</button>
+      </form>
+    {% endif %}
+  </div>
+</div>
+
+<div class="space-y-6">
+  <div class="bg-slate-900 border border-slate-800 rounded-xl p-5">
+    <h3 class="font-semibold text-white mb-3">Active sessions</h3>
+    {% for s in sessions %}
+    <div class="flex items-center justify-between border-b border-slate-800 py-2 text-sm">
+      <div><div class="truncate max-w-[240px]">{{ s.device or 'Unknown device' }}</div>
+        <div class="text-xs text-slate-500">{{ s.ip }} · last seen {{ s.last_seen_at.strftime('%Y-%m-%d %H:%M') }}</div></div>
+      <form method="post" action="/security/sessions/{{ s.id }}/revoke">
+        <button class="text-rose-400 hover:text-rose-300 text-xs">revoke</button></form>
+    </div>
+    {% endfor %}
+  </div>
+  <div class="bg-slate-900 border border-slate-800 rounded-xl p-5">
+    <h3 class="font-semibold text-white mb-3">Login history</h3>
+    {% for l in logins %}
+    <div class="flex justify-between text-sm border-b border-slate-800 py-1.5">
+      <span class="{{ 'text-rose-400' if l.action=='login_failed' }}">{{ l.action|replace('_',' ') }}</span>
+      <span class="text-slate-500 text-xs">{{ l.ip }} · {{ l.created_at.strftime('%m-%d %H:%M') }}</span>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+</div>
+{% endblock %}

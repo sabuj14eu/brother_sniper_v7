@@ -1,0 +1,38 @@
+{% extends "admin/_base.html" %}
+{% from "_macros.html" import stat, status_badge %}
+{% block content %}
+<h1 class="text-2xl font-bold text-white mb-6">Admin Dashboard</h1>
+<div class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
+  {{ stat('Users', stats.users) }}
+  {{ stat('Live users (5m)', stats.live_users) }}
+  {{ stat('MT5 online', stats.mt5_online ~ '/' ~ stats.mt5_total,
+          tone='good' if stats.mt5_online else 'bad') }}
+  {{ stat('Trades today', stats.trades_today) }}
+  {{ stat('Open positions', stats.open_positions) }}
+  {{ stat('Total revenue', stats.revenue|money, tone='good') }}
+  {{ stat('Active subscribers', stats.subscribers) }}
+  {{ stat('Open tickets', stats.open_tickets, tone='bad' if stats.open_tickets else '') }}
+  {{ stat('Signals today', stats.signals_today) }}
+</div>
+<div class="grid lg:grid-cols-2 gap-6">
+  <div class="bg-slate-900 border border-slate-800 rounded-xl p-4">
+    <h3 class="font-semibold text-white mb-3">Server status <a class="text-xs text-brand float-right" href="/admin/servers">manage →</a></h3>
+    {% for n in nodes %}
+    <div class="flex justify-between items-center border-b border-slate-800 py-2 text-sm">
+      <span>{{ n.name }} <span class="text-xs text-slate-500 uppercase">{{ n.role }}</span></span>
+      {{ status_badge(n.status) }}
+    </div>
+    {% else %}<p class="text-slate-500 text-sm">No nodes registered.</p>{% endfor %}
+  </div>
+  <div class="bg-slate-900 border border-slate-800 rounded-xl p-4">
+    <h3 class="font-semibold text-white mb-3">Recent signals <a class="text-xs text-brand float-right" href="/admin/engine">engine →</a></h3>
+    <table class="data w-full">
+    {% for s in recent_signals %}
+    <tr><td>{{ s.created_at.strftime('%m-%d %H:%M') }}</td><td class="font-semibold">{{ s.symbol }}</td>
+      <td class="{{ 'text-emerald-400' if s.direction=='BUY' else 'text-rose-400' }}">{{ s.direction }}</td>
+      <td>{{ status_badge(s.status) }}</td></tr>
+    {% endfor %}
+    </table>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,33 @@
+{% extends "admin/_base.html" %}
+{% from "_macros.html" import field, status_badge, badge %}
+{% block content %}
+<h1 class="text-2xl font-bold text-white mb-6">Broker Management</h1>
+<div class="grid lg:grid-cols-3 gap-6">
+<div class="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-xl overflow-x-auto">
+  <table class="data w-full">
+  <tr><th>Broker</th><th>Servers</th><th>Symbols</th><th>Latency</th><th>Health</th><th></th></tr>
+  {% for b in brokers %}
+  <tr>
+    <td class="font-semibold">{{ b.name }} {% if not b.active %}{{ badge('disabled','red') }}{% endif %}</td>
+    <td class="text-xs">{{ b.servers|join(', ') or '—' }}</td>
+    <td class="text-xs max-w-[200px] truncate">{{ b.supported_symbols|join(', ') or '—' }}</td>
+    <td>{{ (b.latency_ms|round|int ~ ' ms') if b.latency_ms else '—' }}</td>
+    <td>{{ status_badge(b.health) }}</td>
+    <td><form method="post" action="/admin/brokers/{{ b.id }}/toggle">
+      <button class="text-xs text-slate-400 hover:text-white">{{ 'disable' if b.active else 'enable' }}</button></form></td>
+  </tr>
+  {% else %}<tr><td colspan="6" class="text-center text-slate-500 py-6">No brokers.</td></tr>{% endfor %}
+  </table>
+</div>
+<div class="bg-slate-900 border border-slate-800 rounded-xl p-5 h-fit">
+  <h3 class="font-semibold text-white mb-4">Add / update broker</h3>
+  <form method="post" action="/admin/brokers/save">
+    {{ field('name', 'Broker name', required=True) }}
+    {{ field('servers', 'Servers (comma separated)', placeholder='ICMarkets-Demo, ICMarkets-Live01') }}
+    {{ field('symbols', 'Supported symbols (comma separated)', placeholder='GOLD, SILVER, US100') }}
+    <button class="w-full bg-brand hover:bg-brand-dark text-slate-950 font-bold py-2 rounded-xl">Save</button>
+  </form>
+  <p class="text-xs text-slate-500 mt-3">Health & latency are updated by monitoring agents, not by hand.</p>
+</div>
+</div>
+{% endblock %}

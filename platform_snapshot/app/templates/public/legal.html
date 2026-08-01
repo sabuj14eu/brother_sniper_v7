@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}{{ title }} — {{ app_name }}{% endblock %}
+{% block content %}
+<div class="max-w-3xl mx-auto px-4 py-16">
+<h1 class="text-4xl font-extrabold text-white mb-8">{{ title }}</h1>
+{% if post %}
+<div class="text-slate-300 whitespace-pre-line">{{ post.body }}</div>
+{% else %}
+<div class="text-slate-400 space-y-4 text-sm">
+{% if doc == 'risk-disclaimer' %}
+<p><strong class="text-white">Trading involves substantial risk of loss.</strong> Foreign exchange, CFD and
+cryptocurrency trading carries a high level of risk and may not be suitable for all investors. Leverage can
+work against you as well as for you. You could lose some or all of your invested capital.</p>
+<p>Brother Bot is software that observes and reports on algorithmic trading systems. Past performance —
+including backtests and demo-account results — is not indicative of future results. Nothing on this platform
+constitutes financial advice.</p>
+<p>Never trade with money you cannot afford to lose. Use investor (read-only) passwords wherever possible,
+and demo accounts until you fully understand the system.</p>
+{% else %}
+<p>The full {{ title }} document will be published here by the operator before public launch. A signed copy
+of every user's acceptance is stored in the consent log.</p>
+{% endif %}
+</div>
+{% endif %}
+</div>
+{% endblock %}

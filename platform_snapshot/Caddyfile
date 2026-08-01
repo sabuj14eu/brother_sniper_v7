@@ -1,0 +1,15 @@
+# Replace app.yourdomain.com with your real domain (DNS A record -> this VPS).
+# Caddy provisions and renews Let's Encrypt certificates automatically.
+
+app.yourdomain.com {
+	encode zstd gzip
+	reverse_proxy app:8000
+
+	# Never cache authenticated pages at the edge
+	header /dashboard* Cache-Control "no-store"
+	header /admin* Cache-Control "no-store"
+
+	# Prometheus scrape + health from inside the network only (optional):
+	@internal_only path /metrics
+	# uncomment to restrict: abort @internal_only
+}

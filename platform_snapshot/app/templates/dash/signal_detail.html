@@ -1,0 +1,82 @@
+{% extends "dash/_base.html" %}
+{% from "_macros.html" import status_badge %}
+{% block content %}
+<a href="/signals" class="text-sm text-brand">← Signal history</a>
+<h1 class="text-2xl font-bold text-white mt-2 mb-6">
+  <span class="{{ 'text-emerald-400' if sig.direction=='BUY' else 'text-rose-400' }}">{{ sig.direction }}</span>
+  {{ sig.symbol }} <span class="text-slate-500 text-base">{{ sig.signal_id }}</span> {{ status_badge(sig.status) }}
+</h1>
+<div class="grid lg:grid-cols-2 gap-6">
+<div class="bg-slate-900 border border-slate-800 rounded-xl p-5">
+  <h3 class="font-semibold text-white mb-3">Levels</h3>
+  <table class="data w-full">
+    {% for k, v in [('System',sig.system),('Timeframe',sig.tf),('Entry',sig.entry),('Stop loss',sig.sl),
+                    ('TP1',sig.tp1),('TP2',sig.tp2),('RR',sig.rr),('Grade',sig.grade),
+                    ('AI score',sig.ai_score),('Confidence', (sig.confidence|round|int ~ '%') if sig.confidence else None),
+                    ('Outcome',sig.outcome or None),('Time', sig.created_at.strftime('%Y-%m-%d %H:%M UTC'))] %}
+    <tr><td class="text-slate-500 w-36">{{ k }}</td><td class="font-medium">{{ v if v is not none else '—' }}</td></tr>
+    {% endfor %}
+  </table>
+</div>
+<div class="space-y-6">
+  <div class="bg-slate-900 border border-slate-800 rounded-xl p-5">
+    <h3 class="font-semibold text-white mb-3">Council votes
+      <span class="text-slate-500 text-sm">{{ sig.council_votes.get('approve','?') }}/{{ sig.council_votes.get('total','?') }} approved</span></h3>
+    {% set members = sig.council_votes.get('members', {}) %}
+    {% if members %}
+    <div class="space-y-1 text-sm">
+      {% for name, vote in members.items() %}
+      <div class="flex justify-between"><span>{{ name }}</span>
+        <span class="{{ 'text-emerald-400' if vote in ('approve', True, 'yes') else 'text-rose-400' }}">{{ vote }}</span></div>
+      {% endfor %}
+    </div>
+    {% else %}<p class="text-slate-500 text-sm">No per-member breakdown provided.</p>{% endif %}
+  </div>
+  <div class="bg-slate-900 border border-slate-800 rounded-xl p-5">
+    <h3 class="font-semibold text-white mb-2">Reason</h3>
+    <p class="text-sm text-slate-300 whitespace-pre-line">{{ sig.reason or '—' }}</p>
+    {% if sig.market_structure %}
+    <h3 class="font-semibold text-white mt-4 mb-2">Market structure</h3>
+    <p class="text-sm text-slate-300 whitespace-pre-line">{{ sig.market_structure }}</p>
+    {% endif %}
+    {% if sig.screenshot_url %}<img src="{{ sig.screenshot_url }}" class="mt-4 rounded-lg border border-slate-700" alt="chart">{% endif %}
+  </div>
+</div>
+</div>
+
+<!-- AI Decision Replay -->
+<div class="grid lg:grid-cols-2 gap-6 mt-6">
+  <div class="bg-slate-900 border border-slate-800 rounded-xl p-5">
+    <h3 class="font-semibold text-white mb-4">🕒 Decision replay timeline</h3>
+    <div class="space-y-0">
+      {% set icons = {'alert_received':'📥','council_decision':'🧠','status_change':'🔀',
+                      'mt5_execution':'🖥️','telegram_sent':'✈️','outcome':'🏁'} %}
+      {% for e in events %}
+      <div class="flex gap-3 border-l-2 {{ 'border-emerald-500' if e.stage in ('council_decision','mt5_execution') else 'border-slate-700' }} pl-4 pb-5 relative">
+        <div class="absolute -left-[11px] top-0 bg-slate-950">{{ icons.get(e.stage, '•') }}</div>
+        <div>
+          <div class="text-xs text-slate-500">{{ e.created_at.strftime('%Y-%m-%d %H:%M:%S') }} UTC ·
+            <span class="uppercase tracking-wide">{{ e.stage|replace('_',' ') }}</span></div>
+          <div class="text-sm mt-0.5">{{ e.detail }}</div>
+          {% if e.stage == 'council_decision' and e.payload %}
+          <div class="text-xs text-slate-500 mt-1">
+            score {{ e.payload.get('ai_score', '—') }} · confidence {{ e.payload.get('confidence', '—') }}
+            {% if e.payload.get('macro') %}· macro: {{ e.payload.macro }}{% endif %}
+            {% if e.payload.get('truth_layer') %}· truth layer: {{ e.payload.truth_layer }}{% endif %}
+          </div>
+          {% endif %}
+        </div>
+      </div>
+      {% else %}
+      <p class="text-slate-500 text-sm">No timeline events recorded (signal predates the replay feature).</p>
+      {% endfor %}
+    </div>
+  </div>
+  <div class="bg-slate-900 border border-slate-800 rounded-xl p-5">
+    <h3 class="font-semibold text-white mb-3">📥 Original alert payload (verbatim)</h3>
+    {% if raw_alert %}
+    <pre class="text-xs bg-slate-950 border border-slate-800 rounded-lg p-3 overflow-x-auto text-slate-300">{{ raw_alert }}</pre>
+    {% else %}<p class="text-slate-500 text-sm">No raw payload stored.</p>{% endif %}
+  </div>
+</div>
+{% endblock %}

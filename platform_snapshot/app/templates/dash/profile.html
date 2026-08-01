@@ -1,0 +1,43 @@
+{% extends "dash/_base.html" %}
+{% from "_macros.html" import field, badge %}
+{% block content %}
+<h1 class="text-2xl font-bold text-white mb-6">Profile</h1>
+{% if saved %}<div class="bg-emerald-500/10 border border-emerald-500/40 text-emerald-300 rounded-xl p-3 mb-4 text-sm">Profile saved.</div>{% endif %}
+<form method="post" action="/profile/save" class="bg-slate-900 border border-slate-800 rounded-xl p-6 max-w-2xl">
+  <div class="flex items-center gap-4 mb-6">
+    <div class="w-16 h-16 rounded-full bg-slate-800 flex items-center justify-center text-2xl overflow-hidden">
+      {% if user.photo_url %}<img src="{{ user.photo_url }}" class="w-full h-full object-cover" alt="">{% else %}👤{% endif %}
+    </div>
+    <div>
+      <div class="font-bold text-white">{{ user.display_name }}</div>
+      <div class="text-sm text-slate-500">{{ user.primary_contact }} {{ badge('verified','green') if user.is_verified }}
+        · KYC: {{ user.kyc_status }}</div>
+    </div>
+  </div>
+  <div class="grid md:grid-cols-2 gap-x-4">
+    {{ field('name', 'Name', value=user.name) }}
+    {{ field('email', 'Email', value=user.email or '', type='email') }}
+    {{ field('photo_url', 'Photo URL', value=user.photo_url) }}
+    {{ field('country', 'Country', value=user.country) }}
+    {{ field('timezone', 'Timezone', value=user.timezone) }}
+    <label class="block mb-3"><span class="text-sm text-slate-400">Language</span>
+      <select name="language" class="mt-1 w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm">
+        {% for code, label in [('en','English'),('pl','Polski'),('bn','বাংলা')] %}
+        <option value="{{ code }}" {{ 'selected' if user.language==code }}>{{ label }}</option>{% endfor %}
+      </select></label>
+    {{ field('currency', 'Display currency', value=user.currency) }}
+    {{ field('broker', 'Primary broker', value=user.broker) }}
+    <label class="block mb-3"><span class="text-sm text-slate-400">Trading experience</span>
+      <select name="trading_experience" class="mt-1 w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm">
+        {% for e in ['','beginner','intermediate','pro'] %}
+        <option value="{{ e }}" {{ 'selected' if user.trading_experience==e }}>{{ e|title or '—' }}</option>{% endfor %}
+      </select></label>
+    <label class="block mb-3"><span class="text-sm text-slate-400">Risk profile</span>
+      <select name="risk_profile" class="mt-1 w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm">
+        {% for rp in ['low','medium','high'] %}
+        <option value="{{ rp }}" {{ 'selected' if user.risk_profile==rp }}>{{ rp|title }}</option>{% endfor %}
+      </select></label>
+  </div>
+  <button class="mt-2 bg-brand hover:bg-brand-dark text-slate-950 font-bold px-6 py-2 rounded-xl">Save profile</button>
+</form>
+{% endblock %}

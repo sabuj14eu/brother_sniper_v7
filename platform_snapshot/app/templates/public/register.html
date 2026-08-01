@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% from "_macros.html" import field %}
+{% block title %}Register — {{ app_name }}{% endblock %}
+{% block content %}
+<div class="max-w-md mx-auto px-4 py-12">
+<h1 class="text-3xl font-extrabold text-white mb-6">Create your account</h1>
+{% if error %}<div class="bg-rose-500/10 border border-rose-500/40 text-rose-300 rounded-xl p-3 mb-4 text-sm">{{ error }}</div>{% endif %}
+<form method="post" class="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+  {{ field('email', 'Email address (verification code is sent here)', type='email', placeholder='you@example.com', required=True) }}
+  {{ field('password', 'Password (min 8 characters)', type='password', required=True) }}
+  {{ field('phone', 'Phone number (optional, with country code)', placeholder='+48123456789') }}
+  {{ field('name', 'Name (optional)') }}
+  <div class="grid grid-cols-2 gap-3">
+    <label class="block mb-3"><span class="text-sm text-slate-400">Country</span>
+      <input name="country" class="mt-1 w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm"></label>
+    <label class="block mb-3"><span class="text-sm text-slate-400">Timezone</span>
+      <select name="timezone" class="mt-1 w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm">
+        {% for tz in ['UTC','Europe/Warsaw','Europe/London','America/New_York','Asia/Dubai','Asia/Singapore','Asia/Dhaka'] %}
+        <option>{{ tz }}</option>{% endfor %}
+      </select></label>
+  </div>
+  <div class="grid grid-cols-2 gap-3">
+    <label class="block mb-3"><span class="text-sm text-slate-400">Language</span>
+      <select name="language" class="mt-1 w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm">
+        <option value="en">English</option><option value="pl">Polski</option><option value="bn">বাংলা</option>
+      </select></label>
+    {{ field('referral_code', 'Referral code (optional)', value=ref) }}
+  </div>
+  <label class="flex items-start gap-2 text-sm text-slate-400 mb-2">
+    <input type="checkbox" name="accept_terms" value="1" class="mt-1 accent-emerald-500" required>
+    <span>I accept the <a class="text-brand" href="/legal/terms" target="_blank">Terms of Service</a> and
+    <a class="text-brand" href="/legal/privacy" target="_blank">Privacy Policy</a></span></label>
+  <label class="flex items-start gap-2 text-sm text-slate-400 mb-5">
+    <input type="checkbox" name="accept_risk" value="1" class="mt-1 accent-emerald-500" required>
+    <span>I have read and accept the <a class="text-brand" href="/legal/risk-disclaimer" target="_blank">Risk Disclaimer</a></span></label>
+  <button class="w-full bg-brand hover:bg-brand-dark text-slate-950 font-bold py-2.5 rounded-xl">Register — verify by email</button>
+</form>
+<p class="text-sm text-slate-500 mt-4 text-center">Already registered? <a class="text-brand" href="/login">Login</a></p>
+</div>
+{% endblock %}

@@ -1,0 +1,56 @@
+{% extends "admin/_base.html" %}
+{% from "_macros.html" import stat, status_badge %}
+{% block content %}
+<h1 class="text-2xl font-bold text-white mb-1">Trading Engine Monitor</h1>
+<p class="text-sm text-slate-500 mb-6">Read-only mirror of the v18 brain pipeline. This platform never dispatches — it observes.</p>
+<div class="grid grid-cols-2 md:grid-cols-6 gap-3 mb-6">
+  {{ stat('Incoming', total) }}
+  {{ stat('Pending', counts.pending, tone='bad' if counts.pending > 10 else '') }}
+  {{ stat('Approved', counts.approved, tone='good') }}
+  {{ stat('Rejected', counts.rejected) }}
+  {{ stat('Executed', counts.executed, tone='good') }}
+  {{ stat('Approval rate', success_rate ~ '%') }}
+</div>
+
+{% if queue %}
+<h3 class="font-semibold text-white mb-3">Council queue ({{ queue|length }})</h3>
+<div class="bg-slate-900 border border-amber-500/30 rounded-xl overflow-x-auto mb-8">
+<table class="data w-full">
+<tr><th>Waiting since</th><th>System</th><th>Symbol</th><th>Dir</th><th>Grade</th></tr>
+{% for s in queue %}
+<tr><td>{{ s.created_at.strftime('%m-%d %H:%M:%S') }}</td><td>{{ s.system }}</td>
+  <td class="font-semibold">{{ s.symbol }}</td><td>{{ s.direction }}</td><td>{{ s.grade or '—' }}</td></tr>
+{% endfor %}
+</table>
+</div>
+{% endif %}
+
+<div class="grid lg:grid-cols-2 gap-6">
+<div>
+  <h3 class="font-semibold text-white mb-3">Recent decisions</h3>
+  <div class="bg-slate-900 border border-slate-800 rounded-xl overflow-x-auto">
+  <table class="data w-full">
+  <tr><th>Time</th><th>Symbol</th><th>Dir</th><th>Council</th><th>Status</th></tr>
+  {% for s in recent %}
+  <tr><td>{{ s.created_at.strftime('%m-%d %H:%M') }}</td><td class="font-semibold">{{ s.symbol }}</td>
+    <td class="{{ 'text-emerald-400' if s.direction=='BUY' else 'text-rose-400' }}">{{ s.direction }}</td>
+    <td>{{ s.council_votes.get('approve','—') }}/{{ s.council_votes.get('total','—') }}</td>
+    <td>{{ status_badge(s.status) }}</td></tr>
+  {% endfor %}
+  </table>
+  </div>
+</div>
+<div>
+  <h3 class="font-semibold text-white mb-3">Webhook ingest log</h3>
+  <div class="bg-slate-900 border border-slate-800 rounded-xl overflow-x-auto">
+  <table class="data w-full">
+  <tr><th>Time</th><th>Source</th><th>Endpoint</th><th>Status</th></tr>
+  {% for l in webhook_logs %}
+  <tr><td>{{ l.created_at.strftime('%m-%d %H:%M:%S') }}</td><td>{{ l.source }}</td>
+    <td class="font-mono text-xs">{{ l.endpoint }}</td><td>{{ l.status_code }}</td></tr>
+  {% else %}<tr><td colspan="4" class="text-center text-slate-500 py-6">No ingest yet.</td></tr>{% endfor %}
+  </table>
+  </div>
+</div>
+</div>
+{% endblock %}

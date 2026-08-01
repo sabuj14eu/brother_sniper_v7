@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Changelog — {{ app_name }}{% endblock %}
+{% block content %}
+<div class="max-w-3xl mx-auto px-4 py-16">
+<h1 class="text-4xl font-extrabold text-white mb-10">Changelog</h1>
+{% for n in notes %}
+<div class="border-l-2 border-brand pl-5 pb-8 relative">
+  <div class="text-xs text-slate-500">{{ n.created_at.strftime('%Y-%m-%d') }}</div>
+  <h3 class="font-bold text-white">{{ n.title }}</h3>
+  <p class="text-sm text-slate-400 mt-1 whitespace-pre-line">{{ n.body }}</p>
+</div>
+{% else %}
+<p class="text-slate-500">No release notes published yet.</p>
+{% endfor %}
+</div>
+{% endblock %}

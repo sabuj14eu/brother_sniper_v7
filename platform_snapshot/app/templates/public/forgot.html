@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% from "_macros.html" import field %}
+{% block title %}Account recovery — {{ app_name }}{% endblock %}
+{% block content %}
+<div class="max-w-md mx-auto px-4 py-16">
+<h1 class="text-3xl font-extrabold text-white mb-6">Recover your account</h1>
+{% if error %}<div class="bg-rose-500/10 border border-rose-500/40 text-rose-300 rounded-xl p-3 mb-4 text-sm">{{ error }}</div>{% endif %}
+{% if stage == 'identifier' %}
+<form method="post" action="/forgot" class="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+  {{ field('dest', 'Email (or phone number)', placeholder='you@example.com', required=True) }}
+  <button class="w-full bg-brand hover:bg-brand-dark text-slate-950 font-bold py-2.5 rounded-xl">Send recovery code</button>
+</form>
+{% else %}
+<p class="text-sm text-slate-400 mb-4">If <strong class="text-white">{{ dest }}</strong> is registered, a recovery
+  code was sent{% if '@' in dest %} — check your inbox and spam folder{% endif %}.</p>
+<form method="post" action="/forgot/reset" class="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+  <input type="hidden" name="dest" value="{{ dest }}">
+  {{ field('code', 'Recovery code', placeholder='123456', required=True) }}
+  {{ field('password', 'New password (min 8 characters)', type='password', required=True) }}
+  <button class="w-full bg-brand hover:bg-brand-dark text-slate-950 font-bold py-2.5 rounded-xl">Set new password</button>
+</form>
+{% endif %}
+</div>
+{% endblock %}

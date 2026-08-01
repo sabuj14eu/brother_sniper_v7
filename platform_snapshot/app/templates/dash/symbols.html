@@ -1,0 +1,32 @@
+{% extends "dash/_base.html" %}
+{% from "_macros.html" import badge %}
+{% block content %}
+<h1 class="text-2xl font-bold text-white mb-6">Symbol Management</h1>
+<div class="grid lg:grid-cols-3 gap-6 max-w-4xl">
+<div class="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-xl p-5">
+  <form method="post" action="/symbols/save">
+    <div class="grid grid-cols-2 md:grid-cols-3 gap-2">
+    {% for s in symbols %}
+      <label class="flex items-center justify-between gap-2 bg-slate-800/60 rounded-lg px-3 py-2 cursor-pointer">
+        <span class="text-sm font-medium">{{ s.symbol }} {% if s.is_custom %}{{ badge('custom','blue') }}{% endif %}</span>
+        <input type="checkbox" name="sym_{{ s.id }}" {% if s.enabled %}checked{% endif %} class="accent-emerald-500 w-4 h-4">
+      </label>
+    {% endfor %}
+    </div>
+    <button class="mt-4 bg-brand hover:bg-brand-dark text-slate-950 font-bold px-5 py-2 rounded-xl">Save</button>
+  </form>
+</div>
+<div class="bg-slate-900 border border-slate-800 rounded-xl p-5 h-fit">
+  <h3 class="font-semibold text-white mb-3">Add custom symbol</h3>
+  <form method="post" action="/symbols/add" class="flex gap-2">
+    <input name="symbol" placeholder="XPTUSD" required class="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm uppercase">
+    <button class="bg-brand text-slate-950 font-bold px-4 rounded-lg">Add</button>
+  </form>
+  {% for s in symbols if s.is_custom %}
+  <form method="post" action="/symbols/{{ s.id }}/delete" class="flex justify-between items-center mt-2 text-sm">
+    <span>{{ s.symbol }}</span><button class="text-rose-400 hover:text-rose-300 text-xs">remove</button>
+  </form>
+  {% endfor %}
+</div>
+</div>
+{% endblock %}

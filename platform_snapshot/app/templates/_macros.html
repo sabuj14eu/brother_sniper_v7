@@ -1,0 +1,53 @@
+{% macro stat(label, value, sub='', tone='') -%}
+<div class="bg-slate-900 border border-slate-800 rounded-xl p-4">
+  <div class="text-xs uppercase tracking-wide text-slate-500">{{ label }}</div>
+  <div class="text-xl font-bold mt-1 {{ 'text-emerald-400' if tone=='good' else 'text-rose-400' if tone=='bad' else 'text-white' }}">{{ value }}</div>
+  {% if sub %}<div class="text-xs text-slate-500 mt-1">{{ sub }}</div>{% endif %}
+</div>
+{%- endmacro %}
+
+{% macro badge(text, tone='slate') -%}
+{% set map = {'green':'bg-emerald-500/15 text-emerald-400','red':'bg-rose-500/15 text-rose-400',
+              'yellow':'bg-amber-500/15 text-amber-400','blue':'bg-sky-500/15 text-sky-400',
+              'slate':'bg-slate-500/15 text-slate-400'} %}
+<span class="px-2 py-0.5 rounded-full text-xs font-medium {{ map.get(tone, map['slate']) }}">{{ text }}</span>
+{%- endmacro %}
+
+{% macro status_badge(status) -%}
+{% set tones = {'active':'green','approved':'green','executed':'green','paid':'green','completed':'green','open':'blue',
+                'win':'green','ok':'green','pending':'yellow','answered':'yellow','unpaid':'yellow','degraded':'yellow',
+                'rejected':'red','cancelled':'red','error':'red','loss':'red','down':'red','banned':'red',
+                'closed':'slate','inactive':'slate','expired':'slate'} %}
+{{ badge(status or '—', tones.get(status, 'slate')) }}
+{%- endmacro %}
+
+{% macro pnl(value) -%}
+<span class="{{ 'text-emerald-400' if value > 0 else 'text-rose-400' if value < 0 else 'text-slate-400' }}">
+{{ '%+.2f'|format(value) }}</span>
+{%- endmacro %}
+
+{% macro pagination(page, pages, base) -%}
+{% if pages > 1 %}
+<div class="flex gap-2 mt-4 text-sm">
+  {% if page > 1 %}<a class="px-3 py-1 bg-slate-800 rounded hover:bg-slate-700" href="{{ base }}page={{ page-1 }}">←</a>{% endif %}
+  <span class="px-3 py-1 text-slate-500">Page {{ page }} / {{ pages }}</span>
+  {% if page < pages %}<a class="px-3 py-1 bg-slate-800 rounded hover:bg-slate-700" href="{{ base }}page={{ page+1 }}">→</a>{% endif %}
+</div>
+{% endif %}
+{%- endmacro %}
+
+{% macro toggle(name, checked, label) -%}
+<label class="flex items-center gap-2 py-1 cursor-pointer">
+  <input type="checkbox" name="{{ name }}" {% if checked %}checked{% endif %}
+         class="accent-emerald-500 w-4 h-4"> <span class="text-sm">{{ label }}</span>
+</label>
+{%- endmacro %}
+
+{% macro field(name, label, value='', type='text', placeholder='', required=False) -%}
+<label class="block mb-3">
+  <span class="text-sm text-slate-400">{{ label }}</span>
+  <input type="{{ type }}" name="{{ name }}" value="{{ value }}" placeholder="{{ placeholder }}"
+         {% if required %}required{% endif %}
+         class="mt-1 w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none">
+</label>
+{%- endmacro %}

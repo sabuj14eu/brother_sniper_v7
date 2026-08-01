@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Features — {{ app_name }}{% endblock %}
+{% block content %}
+<div class="max-w-5xl mx-auto px-4 py-16">
+<h1 class="text-4xl font-extrabold text-white">Everything a serious trader needs</h1>
+<div class="mt-10 space-y-8">
+  {% for title, text in [
+    ('AI Council decision engine','Every TradingView signal is judged by a 6-agent council with configurable approval and risk thresholds. Rejected signals are logged with their reason — full transparency.'),
+    ('Multiple MT5 accounts','Add accounts across brokers, activate/deactivate per account, watch balance, equity, free margin and floating P/L live via executor heartbeats.'),
+    ('Telegram, SMS & push notifications','Per-event toggles: entries, exits, partial closes, TP/SL hits, daily/weekly/monthly reports, news and system alerts.'),
+    ('Risk Manager','Daily/weekly/monthly loss limits, max consecutive losses, max exposure, max lots — and a one-click emergency stop that halts everything.'),
+    ('Trade Journal & Analytics','Every trade with notes, emotion tags and screenshots. Equity curve, monthly returns, win-rate and drawdown charts, session and symbol performance.'),
+    ('Trade Copier','Master/slave copy across your accounts with ratio, reverse-copy and risk multiplier.'),
+    ('Affiliate program','Your referral link, click and signup tracking, 20% commission on referred subscriptions, leaderboard.'),
+    ('API & Webhooks','Personal API keys with read/write scopes, REST API for portfolio and history, webhook logs.'),
+  ] %}
+  <div class="flex gap-4">
+    <div class="text-brand text-2xl">✔</div>
+    <div><h3 class="font-bold text-white">{{ title }}</h3><p class="text-slate-400 text-sm mt-1">{{ text }}</p></div>
+  </div>
+  {% endfor %}
+</div>
+<a href="/register" class="inline-block mt-12 bg-brand hover:bg-brand-dark text-slate-950 font-bold px-8 py-3 rounded-xl">Create your account</a>
+</div>
+{% endblock %}

@@ -1,0 +1,41 @@
+{% extends "dash/_base.html" %}
+{% from "_macros.html" import stat, badge %}
+{% block content %}
+<h1 class="text-2xl font-bold text-white mb-1">VPS Monitor</h1>
+<p class="text-sm text-slate-500 mb-6">
+  {% if vps and vps.updated_at %}Last heartbeat: {{ vps.updated_at.strftime('%Y-%m-%d %H:%M') }} UTC
+  {% else %}No agent heartbeat received yet — install the Linux agent or Windows executor.{% endif %}
+</p>
+{% if vps %}
+<div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+  {{ stat('CPU', vps.cpu_pct|round|int ~ '%', tone='bad' if vps.cpu_pct > 85 else '') }}
+  {{ stat('RAM', vps.ram_pct|round|int ~ '%', tone='bad' if vps.ram_pct > 85 else '') }}
+  {{ stat('Disk', vps.disk_pct|round|int ~ '%', tone='bad' if vps.disk_pct > 90 else '') }}
+  {{ stat('Latency', vps.latency_ms|round|int ~ ' ms', tone='bad' if vps.latency_ms > 200 else '') }}
+</div>
+<div class="flex gap-3 mb-6">
+  {{ badge('Internet ' + ('✓' if vps.internet_ok else '✗'), 'green' if vps.internet_ok else 'red') }}
+  {{ badge('EA ' + ('running' if vps.ea_running else 'stopped'), 'green' if vps.ea_running else 'red') }}
+  {{ badge('MT5 ' + ('running' if vps.mt5_running else 'stopped'), 'green' if vps.mt5_running else 'red') }}
+  {{ badge('Auto-reconnect ' + ('on' if vps.auto_reconnect else 'off'), 'green' if vps.auto_reconnect else 'yellow') }}
+  {{ badge('Symbols ' + ('synced' if vps.symbols_synced else 'not synced'), 'green' if vps.symbols_synced else 'yellow') }}
+</div>
+
+<h3 class="font-semibold text-white mb-3">Broker Executor Monitor</h3>
+<div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+  {{ stat('MT5 version', vps.mt5_version or '—') }}
+  {{ stat('EA version', vps.ea_version or '—') }}
+  {{ stat('Trade latency', (vps.trade_latency_ms|round|int ~ ' ms') if vps.trade_latency_ms else '—',
+          tone='bad' if vps.trade_latency_ms > 500 else '') }}
+  {{ stat('Execution queue', vps.queue_length, tone='bad' if vps.queue_length > 5 else '') }}
+  {{ stat('Last successful order', vps.last_order_ok_at.strftime('%m-%d %H:%M') if vps.last_order_ok_at else 'never',
+          tone='good' if vps.last_order_ok_at else '') }}
+  {{ stat('Last failed order', vps.last_order_fail_at.strftime('%m-%d %H:%M') if vps.last_order_fail_at else 'never',
+          vps.last_order_fail_reason, tone='bad' if vps.last_order_fail_at else 'good') }}
+</div>
+{% endif %}
+<form method="post" action="/vps/restart" onsubmit="return confirm('Request VPS service restart?')">
+  <button class="bg-amber-600 hover:bg-amber-500 text-white font-bold px-6 py-2.5 rounded-xl">🔄 Request restart</button>
+</form>
+<p class="text-xs text-slate-500 mt-3">Health here reflects agent heartbeats only — a live process, not a green endpoint, is the proof.</p>
+{% endblock %}

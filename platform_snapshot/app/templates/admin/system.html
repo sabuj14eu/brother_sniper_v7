@@ -1,0 +1,68 @@
+{% extends "admin/_base.html" %}
+{% from "_macros.html" import field, badge, stat %}
+{% block content %}
+<h1 class="text-2xl font-bold text-white mb-1">Super Admin — System</h1>
+<p class="text-sm text-slate-500 mb-6">Feature flags, system settings, maintenance mode, error monitor.</p>
+
+<div class="grid grid-cols-2 md:grid-cols-3 gap-3 mb-6 max-w-2xl">
+  {{ stat('Maintenance mode', maintenance|upper, tone='bad' if maintenance=='on' else 'good') }}
+  {{ stat('Active API keys', api_keys) }}
+  {{ stat('Recent ingest errors', errors|length, tone='bad' if errors else 'good') }}
+</div>
+
+<div class="grid lg:grid-cols-2 gap-6">
+<div class="space-y-6">
+  <div class="bg-slate-900 border {{ 'border-rose-500/50' if maintenance=='on' else 'border-slate-800' }} rounded-xl p-5">
+    <h3 class="font-semibold text-white mb-2">Maintenance mode</h3>
+    <p class="text-sm text-slate-500 mb-4">Blocks the user area with a 503; public site, admin, API and webhooks stay reachable.</p>
+    <form method="post" action="/admin/system/maintenance"
+          onsubmit="return confirm('Toggle maintenance mode?')">
+      <button class="{{ 'bg-rose-600 hover:bg-rose-500 text-white' if maintenance=='off' else 'bg-emerald-600 hover:bg-emerald-500 text-white' }} font-bold px-5 py-2 rounded-xl">
+        {{ 'Enable maintenance' if maintenance=='off' else 'Disable maintenance' }}</button>
+    </form>
+  </div>
+
+  <div class="bg-slate-900 border border-slate-800 rounded-xl p-5">
+    <h3 class="font-semibold text-white mb-3">Feature flags</h3>
+    {% for f in flags %}
+    <div class="flex items-center justify-between border-b border-slate-800 py-2 text-sm">
+      <div><span class="font-mono">{{ f.key }}</span>
+        <div class="text-xs text-slate-500">{{ f.description }}</div></div>
+      <form method="post" action="/admin/system/flags/{{ f.id }}/toggle">
+        <button class="text-xs px-3 py-1 rounded-full {{ 'bg-emerald-500/20 text-emerald-400' if f.enabled else 'bg-slate-700 text-slate-400' }}">
+          {{ 'ON' if f.enabled else 'OFF' }}</button></form>
+    </div>
+    {% endfor %}
+    <form method="post" action="/admin/system/flags/save" class="flex gap-2 mt-3">
+      <input name="key" placeholder="flag_key" required class="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm font-mono">
+      <input name="description" placeholder="description" class="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm">
+      <button class="bg-slate-700 hover:bg-slate-600 rounded-lg px-3 text-sm">Add</button>
+    </form>
+  </div>
+</div>
+
+<div class="space-y-6">
+  <div class="bg-slate-900 border border-slate-800 rounded-xl p-5">
+    <h3 class="font-semibold text-white mb-3">System settings</h3>
+    {% for s in settings_rows %}
+    <div class="flex justify-between text-sm border-b border-slate-800 py-1.5">
+      <span class="font-mono">{{ s.key }}</span><span class="text-slate-400">{{ s.value }}</span></div>
+    {% endfor %}
+    <form method="post" action="/admin/system/settings/save" class="flex gap-2 mt-3">
+      <input name="key" placeholder="key" required class="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm font-mono">
+      <input name="value" placeholder="value" class="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm">
+      <button class="bg-slate-700 hover:bg-slate-600 rounded-lg px-3 text-sm">Set</button>
+    </form>
+    <p class="text-xs text-slate-500 mt-3">API secrets & license keys live in the environment (.env), never in this table (Iron Rule 4). Database backup/restore and queue/cache monitoring run through the ops runbook.</p>
+  </div>
+  <div class="bg-slate-900 border border-slate-800 rounded-xl p-5">
+    <h3 class="font-semibold text-white mb-3">Error monitor (ingest ≥400)</h3>
+    {% for e in errors %}
+    <div class="flex justify-between text-sm border-b border-slate-800 py-1.5">
+      <span class="font-mono text-xs">{{ e.endpoint }}</span>
+      <span class="text-rose-400">{{ e.status_code }} · {{ e.created_at.strftime('%m-%d %H:%M') }}</span></div>
+    {% else %}<p class="text-slate-500 text-sm">No recent errors.</p>{% endfor %}
+  </div>
+</div>
+</div>
+{% endblock %}

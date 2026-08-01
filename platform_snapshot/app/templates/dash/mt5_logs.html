@@ -1,0 +1,14 @@
+{% extends "dash/_base.html" %}
+{% block content %}
+<h1 class="text-2xl font-bold text-white mb-1">Logs — {{ account.account_name }}</h1>
+<a href="/mt5" class="text-sm text-brand">← Back to MT5 accounts</a>
+<div class="bg-slate-900 border border-slate-800 rounded-xl mt-4 overflow-x-auto">
+<table class="data w-full">
+<tr><th>Time</th><th>Action</th><th>Detail</th><th>IP</th></tr>
+{% for l in logs %}
+<tr><td>{{ l.created_at.strftime('%Y-%m-%d %H:%M') }}</td><td>{{ l.action }}</td>
+  <td>{{ l.detail }}</td><td>{{ l.ip }}</td></tr>
+{% else %}<tr><td colspan="4" class="text-center text-slate-500 py-6">No log entries.</td></tr>{% endfor %}
+</table>
+</div>
+{% endblock %}

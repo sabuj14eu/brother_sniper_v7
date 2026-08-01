@@ -1,0 +1,65 @@
+{% extends "dash/_base.html" %}
+{% from "_macros.html" import field, status_badge, badge %}
+{% block content %}
+<h1 class="text-2xl font-bold text-white mb-1">MT5 Accounts</h1>
+<p class="text-sm text-slate-500 mb-6">Plan limit: {{ plan.max_mt5_accounts if plan else 1 }} account(s). Online status comes from executor heartbeats.</p>
+{% if error %}<div class="bg-rose-500/10 border border-rose-500/40 text-rose-300 rounded-xl p-3 mb-4 text-sm">{{ error }}</div>{% endif %}
+
+<div class="grid lg:grid-cols-3 gap-6">
+<div class="lg:col-span-2 space-y-4">
+  {% for a in accounts %}
+  <div class="bg-slate-900 border border-slate-800 rounded-xl p-5">
+    <div class="flex items-center justify-between">
+      <div>
+        <div class="font-bold text-white">{{ a.account_name }}
+          {% if a.is_master %}{{ badge('MASTER','blue') }}{% endif %}</div>
+        <div class="text-sm text-slate-500">{{ a.broker }} · {{ a.server }} · login {{ a.login }} · {{ a.password_kind }} password</div>
+      </div>
+      <div class="flex items-center gap-2">
+        {{ badge('online' if a.is_online else 'offline', 'green' if a.is_online else 'red') }}
+        {{ status_badge(a.status) }}
+      </div>
+    </div>
+    <div class="grid grid-cols-4 gap-3 mt-4 text-sm">
+      <div><div class="text-xs text-slate-500">Balance</div><div class="font-semibold">{{ a.balance|money }}</div></div>
+      <div><div class="text-xs text-slate-500">Equity</div><div class="font-semibold">{{ a.equity|money }}</div></div>
+      <div><div class="text-xs text-slate-500">Free margin</div><div class="font-semibold">{{ a.free_margin|money }}</div></div>
+      <div><div class="text-xs text-slate-500">Floating</div><div class="font-semibold">{{ a.floating_pnl|money }}</div></div>
+    </div>
+    <div class="flex flex-wrap gap-2 mt-4 text-xs">
+      {% for action, label in [('test','Test Connection'),('activate','Activate'),('deactivate','Deactivate'),('reconnect','Reconnect')] %}
+      <form method="post" action="/mt5/{{ a.id }}/{{ action }}">
+        <button class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg">{{ label }}</button></form>
+      {% endfor %}
+      <a href="/mt5/{{ a.id }}/logs" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg">View Logs</a>
+      <form method="post" action="/mt5/{{ a.id }}/delete" onsubmit="return confirm('Delete this MT5 account?')">
+        <button class="px-3 py-1.5 bg-rose-500/20 text-rose-400 hover:bg-rose-500/30 rounded-lg">Delete</button></form>
+    </div>
+  </div>
+  {% else %}
+  <div class="bg-slate-900 border border-dashed border-slate-700 rounded-xl p-10 text-center text-slate-500">
+    No MT5 accounts yet — add your first one.</div>
+  {% endfor %}
+</div>
+
+<div class="bg-slate-900 border border-slate-800 rounded-xl p-5 h-fit">
+  <h3 class="font-semibold text-white mb-4">Add MT5 account</h3>
+  <form method="post" action="/mt5/add">
+    <label class="block mb-3"><span class="text-sm text-slate-400">Broker</span>
+      <input name="broker" list="broker-list" required class="mt-1 w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm">
+      <datalist id="broker-list">{% for b in brokers %}<option>{{ b.name }}</option>{% endfor %}</datalist></label>
+    {{ field('server', 'Server', placeholder='ICMarkets-Demo', required=True) }}
+    {{ field('login', 'Login', required=True) }}
+    {{ field('password', 'Password', type='password', required=True) }}
+    <label class="block mb-3"><span class="text-sm text-slate-400">Password type</span>
+      <select name="password_kind" class="mt-1 w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm">
+        <option value="investor">Investor (read-only, recommended)</option>
+        <option value="trading">Trading (only if your executor requires it)</option>
+      </select></label>
+    {{ field('account_name', 'Account name (optional)') }}
+    <button class="w-full bg-brand hover:bg-brand-dark text-slate-950 font-bold py-2 rounded-xl">Add account</button>
+    <p class="text-xs text-slate-500 mt-3">Credentials are encrypted at rest and never shown again.</p>
+  </form>
+</div>
+</div>
+{% endblock %}

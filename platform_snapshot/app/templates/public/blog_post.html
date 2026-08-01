@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}{{ post.title if post else 'Not found' }} — {{ app_name }}{% endblock %}
+{% block content %}
+<div class="max-w-3xl mx-auto px-4 py-16">
+{% if post %}
+<div class="text-xs text-slate-500">{{ post.created_at.strftime('%Y-%m-%d') }} · {{ post.type }}</div>
+<h1 class="text-4xl font-extrabold text-white mt-2">{{ post.title }}</h1>
+<div class="prose prose-invert mt-8 text-slate-300 whitespace-pre-line">{{ post.body }}</div>
+{% else %}
+<h1 class="text-2xl font-bold text-white">Post not found</h1>
+<a class="text-brand" href="/blog">← Back to blog</a>
+{% endif %}
+</div>
+{% endblock %}

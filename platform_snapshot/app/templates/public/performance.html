@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% from "_macros.html" import status_badge %}
+{% block title %}Performance — {{ app_name }}{% endblock %}
+{% block content %}
+<div class="max-w-5xl mx-auto px-4 py-16">
+<h1 class="text-4xl font-extrabold text-white">Live signal performance</h1>
+<p class="text-slate-400 mt-2">Every council decision is public — approvals and rejections alike. {{ approved }}/{{ total }} signals approved to date.</p>
+<div class="mt-8 bg-slate-900 border border-slate-800 rounded-xl overflow-x-auto">
+<table class="data w-full">
+<tr><th>Time (UTC)</th><th>System</th><th>Symbol</th><th>Dir</th><th>Entry</th><th>RR</th><th>Confidence</th><th>Status</th><th>Outcome</th></tr>
+{% for s in signals %}
+<tr>
+  <td>{{ s.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+  <td>{{ s.system }}</td><td class="font-semibold">{{ s.symbol }}</td>
+  <td class="{{ 'text-emerald-400' if s.direction=='BUY' else 'text-rose-400' }}">{{ s.direction }}</td>
+  <td>{{ s.entry or '—' }}</td><td>{{ s.rr or '—' }}</td>
+  <td>{{ (s.confidence|round|int ~ '%') if s.confidence else '—' }}</td>
+  <td>{{ status_badge(s.status) }}</td><td>{{ status_badge(s.outcome) if s.outcome else '—' }}</td>
+</tr>
+{% else %}
+<tr><td colspan="9" class="text-center text-slate-500 py-8">No signals yet.</td></tr>
+{% endfor %}
+</table>
+</div>
+<p class="text-xs text-slate-600 mt-4">Demo-account performance. Past performance is not indicative of future results.</p>
+</div>
+{% endblock %}

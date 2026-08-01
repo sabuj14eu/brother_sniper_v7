@@ -1,0 +1,50 @@
+{% extends "dash/_base.html" %}
+{% from "_macros.html" import toggle %}
+{% block content %}
+<h1 class="text-2xl font-bold text-white mb-6">Bot Settings</h1>
+<form method="post" action="/bot/save" class="grid lg:grid-cols-2 gap-6 max-w-4xl">
+<div class="bg-slate-900 border border-slate-800 rounded-xl p-5">
+  <h3 class="font-semibold text-white mb-4">Mode & risk</h3>
+  <label class="block mb-3"><span class="text-sm text-slate-400">Trading mode</span>
+    <select name="trading_mode" class="mt-1 w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm">
+      {% for m in ['demo','live','paper'] %}<option value="{{ m }}" {{ 'selected' if s.trading_mode==m }}>{{ m|title }}</option>{% endfor %}
+    </select></label>
+  <label class="block mb-3"><span class="text-sm text-slate-400">Risk level</span>
+    <select name="risk_level" class="mt-1 w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm">
+      {% for r in ['low','medium','high','custom'] %}<option value="{{ r }}" {{ 'selected' if s.risk_level==r }}>{{ r|title }}</option>{% endfor %}
+    </select></label>
+  <div class="grid grid-cols-2 gap-3">
+    <label class="block mb-3"><span class="text-sm text-slate-400">Lot size</span>
+      <input name="lot_size" type="number" step="0.01" min="0.01" value="{{ s.lot_size }}" class="mt-1 w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm"></label>
+    <label class="block mb-3"><span class="text-sm text-slate-400">Max trades / day</span>
+      <input name="max_trades" type="number" min="1" value="{{ s.max_trades }}" class="mt-1 w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm"></label>
+    <label class="block mb-3"><span class="text-sm text-slate-400">Max daily loss %</span>
+      <input name="max_daily_loss" type="number" step="0.1" value="{{ s.max_daily_loss }}" class="mt-1 w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm"></label>
+    <label class="block mb-3"><span class="text-sm text-slate-400">Max daily profit % (0 = off)</span>
+      <input name="max_daily_profit" type="number" step="0.1" value="{{ s.max_daily_profit }}" class="mt-1 w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm"></label>
+    <label class="block mb-3"><span class="text-sm text-slate-400">Max drawdown %</span>
+      <input name="max_drawdown" type="number" step="0.1" value="{{ s.max_drawdown }}" class="mt-1 w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm"></label>
+    <label class="block mb-3"><span class="text-sm text-slate-400">Max open positions</span>
+      <input name="max_open_positions" type="number" min="1" value="{{ s.max_open_positions }}" class="mt-1 w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm"></label>
+    <label class="block mb-3"><span class="text-sm text-slate-400">Max slippage (pips)</span>
+      <input name="max_slippage" type="number" step="0.1" value="{{ s.max_slippage }}" class="mt-1 w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm"></label>
+  </div>
+</div>
+<div class="bg-slate-900 border border-slate-800 rounded-xl p-5">
+  <h3 class="font-semibold text-white mb-4">Sessions & filters</h3>
+  {{ toggle('session_asia', s.sessions.get('asia'), 'Asia session') }}
+  {{ toggle('session_london', s.sessions.get('london'), 'London session') }}
+  {{ toggle('session_newyork', s.sessions.get('newyork'), 'New York session') }}
+  {{ toggle('session_weekend', s.sessions.get('weekend_crypto'), 'Weekend crypto') }}
+  <hr class="border-slate-800 my-3">
+  {{ toggle('news_filter', s.news_filter, 'News filter (pause around high-impact news)') }}
+  {{ toggle('spread_filter', s.spread_filter, 'Spread filter') }}
+  {{ toggle('auto_close_friday', s.auto_close_friday, 'Auto-close before weekend (Friday)') }}
+  {{ toggle('trailing_stop', s.trailing_stop, 'Trailing stop') }}
+  {{ toggle('break_even', s.break_even, 'Break-even move') }}
+  {{ toggle('partial_close', s.partial_close, 'Partial close at TP1') }}
+  <button class="mt-5 w-full bg-brand hover:bg-brand-dark text-slate-950 font-bold py-2.5 rounded-xl">Save settings</button>
+  <p class="text-xs text-slate-500 mt-3">Every change is recorded in your audit log.</p>
+</div>
+</form>
+{% endblock %}

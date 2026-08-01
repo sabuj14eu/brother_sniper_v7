@@ -1,0 +1,76 @@
+{% extends "admin/_base.html" %}
+{% from "_macros.html" import badge, status_badge %}
+{% block content %}
+<a href="/admin/users" class="text-sm text-brand">← Users</a>
+<h1 class="text-2xl font-bold text-white mt-2 mb-1">{{ target.display_name }}
+  {{ badge(target.role, 'yellow' if target.is_admin else 'slate') }}
+  {% if target.is_banned %}{{ badge('banned','red') }}{% elif target.is_suspended %}{{ badge('suspended','yellow') }}{% endif %}
+</h1>
+<p class="text-sm text-slate-500 mb-6">{{ target.email or 'no email' }} · {{ target.phone or 'no phone' }} · joined {{ target.created_at.strftime('%Y-%m-%d') }}
+  · KYC {{ target.kyc_status }}</p>
+{% if msg %}<div class="bg-sky-500/10 border border-sky-500/30 text-sky-300 rounded-xl p-3 mb-4 text-sm">{{ msg }}</div>{% endif %}
+
+<div class="grid lg:grid-cols-3 gap-6">
+<div class="bg-slate-900 border border-slate-800 rounded-xl p-5 h-fit">
+  <h3 class="font-semibold text-white mb-3">Actions</h3>
+  <div class="space-y-2">
+    {% for action, label, danger in [
+      ('suspend','Suspend', True) if not target.is_suspended else ('unsuspend','Unsuspend', False),
+      ('ban','Ban', True) if not target.is_banned else ('unban','Unban', False),
+      ('reset_password','Reset password', False),
+      ('reset_2fa','Reset 2FA', False),
+    ] %}
+    <form method="post" action="/admin/users/{{ target.id }}/action">
+      <input type="hidden" name="action" value="{{ action }}">
+      <button class="w-full text-left text-sm px-3 py-2 rounded-lg {{ 'bg-rose-500/15 text-rose-400 hover:bg-rose-500/25' if danger else 'bg-slate-800 hover:bg-slate-700' }}">{{ label }}</button>
+    </form>
+    {% endfor %}
+    <form method="post" action="/admin/users/{{ target.id }}/action" class="flex gap-2">
+      <input type="hidden" name="action" value="assign_plan">
+      <select name="value" class="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-2 py-2 text-sm">
+        {% for p in plans %}<option value="{{ p.slug }}">{{ p.name }}</option>{% endfor %}</select>
+      <button class="bg-slate-700 hover:bg-slate-600 rounded-lg px-3 text-sm">Assign plan</button>
+    </form>
+    {% if not target.is_admin %}
+    <form method="post" action="/admin/users/{{ target.id }}/impersonate"
+          onsubmit="return confirm('Impersonate this user? Your admin session will be replaced for 1 hour.')">
+      <button class="w-full text-left text-sm px-3 py-2 rounded-lg bg-amber-500/15 text-amber-400 hover:bg-amber-500/25">Impersonate user</button>
+    </form>
+    {% endif %}
+  </div>
+</div>
+
+<div class="lg:col-span-2 space-y-6">
+  <div class="bg-slate-900 border border-slate-800 rounded-xl p-5">
+    <h3 class="font-semibold text-white mb-3">MT5 accounts</h3>
+    <table class="data w-full">
+    <tr><th>Name</th><th>Broker</th><th>Login</th><th>Balance</th><th>Status</th></tr>
+    {% for a in accounts %}
+    <tr><td>{{ a.account_name }}</td><td>{{ a.broker }}</td><td>{{ a.login }}</td>
+      <td>{{ a.balance|money }}</td><td>{{ status_badge(a.status) }}</td></tr>
+    {% else %}<tr><td colspan="5" class="text-slate-500 text-center py-4">None.</td></tr>{% endfor %}
+    </table>
+  </div>
+  <div class="bg-slate-900 border border-slate-800 rounded-xl p-5">
+    <h3 class="font-semibold text-white mb-3">Subscriptions</h3>
+    <table class="data w-full">
+    <tr><th>Plan</th><th>Status</th><th>Started</th><th>Expires</th></tr>
+    {% for s in subs %}
+    <tr><td>{{ s.plan.name }}</td><td>{{ status_badge(s.status) }}</td>
+      <td>{{ s.started_at.strftime('%Y-%m-%d') }}</td>
+      <td>{{ s.expires_at.strftime('%Y-%m-%d') if s.expires_at else '—' }}</td></tr>
+    {% else %}<tr><td colspan="4" class="text-slate-500 text-center py-4">None.</td></tr>{% endfor %}
+    </table>
+  </div>
+  <div class="bg-slate-900 border border-slate-800 rounded-xl p-5">
+    <h3 class="font-semibold text-white mb-3">Recent activity</h3>
+    <table class="data w-full">
+    {% for l in logs %}
+    <tr><td>{{ l.created_at.strftime('%m-%d %H:%M') }}</td><td>{{ l.actor }}</td>
+      <td>{{ l.action }}</td><td class="max-w-xs truncate" title="{{ l.detail }}">{{ l.detail }}</td></tr>
+    {% endfor %}
+    </table>
+  </div>
+</div>
+</div>
+{% endblock %}

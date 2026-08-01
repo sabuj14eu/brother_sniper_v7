@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Documentation — {{ app_name }}{% endblock %}
+{% block content %}
+<div class="max-w-4xl mx-auto px-4 py-16">
+<h1 class="text-4xl font-extrabold text-white mb-10">Documentation</h1>
+{% for d in docs %}
+<a href="/blog/{{ d.slug }}" class="block bg-slate-900 border border-slate-800 rounded-xl p-5 mb-3 hover:border-slate-600">
+  <div class="text-xs uppercase text-slate-500">{{ d.type }}</div>
+  <div class="font-semibold text-white">{{ d.title }}</div>
+  <p class="text-sm text-slate-400 mt-1">{{ d.body[:180] }}…</p>
+</a>
+{% else %}
+<p class="text-slate-500">Documentation is being written. The PDF manual is available under <a class="text-brand" href="/downloads">Downloads</a>.</p>
+{% endfor %}
+</div>
+{% endblock %}

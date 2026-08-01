@@ -1,0 +1,33 @@
+{% extends "dash/_base.html" %}
+{% from "_macros.html" import status_badge, pagination %}
+{% block content %}
+<h1 class="text-2xl font-bold text-white mb-6">Signal History <span class="text-sm text-slate-500 font-normal">({{ total }})</span></h1>
+<form class="flex gap-2 mb-4 text-sm">
+  <select name="status" class="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5">
+    <option value="">All statuses</option>
+    {% for st in ['pending','approved','rejected','cancelled','executed'] %}
+    <option value="{{ st }}" {{ 'selected' if status==st }}>{{ st|title }}</option>{% endfor %}
+  </select>
+  <input name="symbol" value="{{ symbol }}" placeholder="Symbol" class="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 w-28 uppercase">
+  <button class="bg-slate-700 hover:bg-slate-600 rounded-lg px-4">Filter</button>
+</form>
+<div class="bg-slate-900 border border-slate-800 rounded-xl overflow-x-auto">
+<table class="data w-full">
+<tr><th>Time (UTC)</th><th>System</th><th>Symbol</th><th>TF</th><th>Dir</th><th>Entry</th><th>SL</th><th>TP1/TP2</th><th>RR</th><th>Grade</th><th>Score</th><th>Council</th><th>Conf.</th><th>Status</th><th>Outcome</th></tr>
+{% for s in signals %}
+<tr class="cursor-pointer" onclick="location='/signals/{{ s.id }}'">
+  <td>{{ s.created_at.strftime('%m-%d %H:%M') }}</td><td>{{ s.system }}</td>
+  <td class="font-semibold">{{ s.symbol }}</td><td>{{ s.tf }}</td>
+  <td class="{{ 'text-emerald-400' if s.direction=='BUY' else 'text-rose-400' }}">{{ s.direction }}</td>
+  <td>{{ s.entry or '—' }}</td><td>{{ s.sl or '—' }}</td>
+  <td>{{ s.tp1 or '—' }}{% if s.tp2 %} / {{ s.tp2 }}{% endif %}</td>
+  <td>{{ s.rr or '—' }}</td><td>{{ s.grade or '—' }}</td><td>{{ s.ai_score or '—' }}</td>
+  <td>{{ s.council_votes.get('approve','—') }}/{{ s.council_votes.get('total','—') }}</td>
+  <td>{{ (s.confidence|round|int ~ '%') if s.confidence else '—' }}</td>
+  <td>{{ status_badge(s.status) }}</td><td>{{ status_badge(s.outcome) if s.outcome else '—' }}</td>
+</tr>
+{% else %}<tr><td colspan="15" class="text-center text-slate-500 py-8">No signals match.</td></tr>{% endfor %}
+</table>
+</div>
+{{ pagination(page, pages, '/signals?status=' ~ status ~ '&symbol=' ~ symbol ~ '&') }}
+{% endblock %}

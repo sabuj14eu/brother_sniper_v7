@@ -1,0 +1,29 @@
+{% extends "dash/_base.html" %}
+{% from "_macros.html" import stat %}
+{% block content %}
+<h1 class="text-2xl font-bold text-white mb-6">Affiliate Program</h1>
+<div class="bg-slate-900 border border-slate-800 rounded-xl p-5 mb-6">
+  <div class="text-sm text-slate-500 mb-2">Your referral link (20% commission on referred subscriptions)</div>
+  <div class="flex gap-2">
+    <input id="reflink" readonly value="{{ link }}" class="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm font-mono">
+    <button onclick="navigator.clipboard.writeText(document.getElementById('reflink').value); this.textContent='Copied!'"
+            class="bg-brand text-slate-950 font-bold px-4 rounded-lg text-sm">Copy</button>
+  </div>
+</div>
+<div class="grid grid-cols-3 gap-3 mb-8 max-w-xl">
+  {{ stat('Clicks', clicks) }}
+  {{ stat('Signups', signups) }}
+  {{ stat('Commission earned', commission|money, 'paid to wallet', 'good') }}
+</div>
+<h3 class="font-semibold text-white mb-3">Leaderboard</h3>
+<div class="bg-slate-900 border border-slate-800 rounded-xl overflow-x-auto max-w-xl">
+<table class="data w-full">
+<tr><th>#</th><th>Affiliate</th><th>Signups</th></tr>
+{% for row in board %}
+<tr class="{{ 'bg-emerald-500/5' if row.me }}"><td>{{ loop.index }}</td>
+  <td>{{ row.name }}{% if row.me %} <span class="text-brand text-xs">(you)</span>{% endif %}</td>
+  <td>{{ row.signups }}</td></tr>
+{% else %}<tr><td colspan="3" class="text-center text-slate-500 py-6">No referrals yet — be the first!</td></tr>{% endfor %}
+</table>
+</div>
+{% endblock %}

@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Admin — {{ active|title }} · {{ app_name }}</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>tailwind.config={darkMode:'class'}</script>
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body class="bg-slate-950 text-slate-200 min-h-screen md:flex">
+{% set nav = [
+  ('dashboard','/admin','📊','Dashboard'),
+  ('users','/admin/users','👥','Users'),
+  ('brokers','/admin/brokers','🏦','Brokers'),
+  ('finance','/admin/finance','💰','Finance'),
+  ('ai','/admin/ai','🧠','AI Control'),
+  ('engine','/admin/engine','⚙️','Engine Monitor'),
+  ('servers','/admin/servers','🖥️','Servers'),
+  ('notify','/admin/notify','📣','Notifications'),
+  ('cms','/admin/cms','📝','CMS'),
+  ('reports','/admin/reports','📑','Reports'),
+  ('compliance','/admin/compliance','⚖️','Compliance'),
+] %}
+<aside class="md:w-56 shrink-0 border-r border-slate-800 bg-slate-950 md:h-screen md:sticky md:top-0 md:overflow-y-auto">
+  <div class="p-4 font-bold text-amber-400"><a href="/admin">⚙️ Admin</a></div>
+  <nav class="px-2 pb-6 flex md:block overflow-x-auto">
+    {% for key, href, icon, label in nav %}
+    <a href="{{ href }}"
+       class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm whitespace-nowrap {{ 'bg-slate-800 text-white' if active==key else 'text-slate-400 hover:text-white hover:bg-slate-900' }}">
+      <span>{{ icon }}</span>{{ label }}</a>
+    {% endfor %}
+    {% if user.role == 'superadmin' %}
+    <a href="/admin/system" class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm {{ 'bg-slate-800 text-white' if active=='system' else 'text-rose-400 hover:bg-slate-900' }}">🔒 Super Admin</a>
+    {% endif %}
+    <a href="/dashboard" class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-slate-500 hover:text-white">↩️ User area</a>
+    <a href="/logout" class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-slate-500 hover:text-white">🚪 Logout</a>
+  </nav>
+</aside>
+<main class="flex-1 min-w-0 p-4 md:p-8">
+  {% block content %}{% endblock %}
+</main>
+</body>
+</html>

@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}{{ app_name }} — AI Trading Platform{% endblock %}</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>tailwind.config={darkMode:'class',theme:{extend:{colors:{brand:{DEFAULT:'#22c55e',dark:'#16a34a'}}}}}</script>
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body class="bg-slate-950 text-slate-200 min-h-screen flex flex-col">
+<nav class="border-b border-slate-800 bg-slate-950/90 backdrop-blur sticky top-0 z-40">
+  <div class="max-w-7xl mx-auto px-4 h-14 flex items-center gap-6">
+    <a href="/" class="font-bold text-lg text-white">🎯 {{ app_name }}</a>
+    <div class="hidden md:flex gap-4 text-sm text-slate-400">
+      <a class="hover:text-white" href="/features">Features</a>
+      <a class="hover:text-white" href="/pricing">Pricing</a>
+      <a class="hover:text-white" href="/performance">Performance</a>
+      <a class="hover:text-white" href="/faq">FAQ</a>
+      <a class="hover:text-white" href="/docs-site">Docs</a>
+      <a class="hover:text-white" href="/blog">Blog</a>
+      <a class="hover:text-white" href="/status">Status</a>
+    </div>
+    <div class="ml-auto flex gap-3 items-center text-sm">
+      {% if user %}
+        <a href="/dashboard" class="bg-brand hover:bg-brand-dark text-slate-950 font-semibold px-4 py-1.5 rounded-lg">Dashboard</a>
+        <a href="/logout" class="text-slate-400 hover:text-white">Logout</a>
+      {% else %}
+        <a href="/login" class="text-slate-300 hover:text-white">Login</a>
+        <a href="/register" class="bg-brand hover:bg-brand-dark text-slate-950 font-semibold px-4 py-1.5 rounded-lg">Get Started</a>
+      {% endif %}
+    </div>
+  </div>
+</nav>
+<main class="flex-1">{% block content %}{% endblock %}</main>
+<footer class="border-t border-slate-800 mt-16 py-10 text-sm text-slate-500">
+  <div class="max-w-7xl mx-auto px-4 grid md:grid-cols-4 gap-8">
+    <div><div class="font-bold text-slate-300 mb-2">🎯 {{ app_name }}</div>
+      <p>Multi-account AI trading platform. All trading involves substantial risk.</p></div>
+    <div><div class="font-semibold text-slate-300 mb-2">Product</div>
+      <a class="block hover:text-white" href="/features">Features</a>
+      <a class="block hover:text-white" href="/pricing">Pricing</a>
+      <a class="block hover:text-white" href="/changelog">Changelog</a>
+      <a class="block hover:text-white" href="/downloads">Downloads</a></div>
+    <div><div class="font-semibold text-slate-300 mb-2">Support</div>
+      <a class="block hover:text-white" href="/faq">FAQ</a>
+      <a class="block hover:text-white" href="/docs-site">Documentation</a>
+      <a class="block hover:text-white" href="/contact">Contact</a>
+      <a class="block hover:text-white" href="/status">Status Page</a></div>
+    <div><div class="font-semibold text-slate-300 mb-2">Legal</div>
+      <a class="block hover:text-white" href="/legal/terms">Terms</a>
+      <a class="block hover:text-white" href="/legal/privacy">Privacy</a>
+      <a class="block hover:text-white" href="/legal/risk-disclaimer">Risk Disclaimer</a>
+      <a class="block hover:text-white" href="/legal/cookies">Cookies</a>
+      <a class="block hover:text-white" href="/legal/gdpr">GDPR</a></div>
+  </div>
+  <div class="max-w-7xl mx-auto px-4 mt-8 text-xs">
+    Trading foreign exchange, CFDs and crypto carries a high level of risk and may not be suitable for all investors.
+    Past performance is not indicative of future results.
+  </div>
+</footer>
+</body>
+</html>

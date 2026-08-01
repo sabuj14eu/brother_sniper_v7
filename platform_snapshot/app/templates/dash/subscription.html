@@ -1,0 +1,55 @@
+{% extends "dash/_base.html" %}
+{% from "_macros.html" import status_badge, badge %}
+{% block content %}
+<h1 class="text-2xl font-bold text-white mb-6">Subscription</h1>
+{% if error %}<div class="bg-rose-500/10 border border-rose-500/40 text-rose-300 rounded-xl p-3 mb-4 text-sm">{{ error }}</div>{% endif %}
+
+<div class="bg-slate-900 border border-slate-800 rounded-xl p-5 mb-6 flex items-center justify-between">
+  <div>
+    <div class="font-bold text-white text-lg">Current plan: {{ plan.name if plan else 'Free' }}</div>
+    <div class="text-sm text-slate-500">
+      {% if sub and sub.expires_at %}Renews/expires {{ sub.expires_at.strftime('%Y-%m-%d') }} ·
+        auto-renew {{ 'on' if sub.auto_renew else 'off' }}{% else %}No paid subscription.{% endif %}
+      · Wallet balance: <span class="text-white font-semibold">{{ balance|money }}</span>
+    </div>
+  </div>
+  {% if sub and sub.auto_renew %}
+  <form method="post" action="/subscription/cancel"><button class="text-sm text-slate-400 hover:text-white border border-slate-700 px-4 py-2 rounded-xl">Disable auto-renew</button></form>
+  {% endif %}
+</div>
+
+<div class="grid md:grid-cols-{{ [plans|length, 5]|min }} gap-4 mb-8">
+  {% for p in plans %}
+  <div class="bg-slate-900 border {{ 'border-brand' if plan and plan.id==p.id else 'border-slate-800' }} rounded-xl p-5 flex flex-col">
+    <div class="font-bold text-white">{{ p.name }}</div>
+    <div class="text-2xl font-extrabold text-white mt-2">${{ '%g'|format(p.price_monthly) }}<span class="text-xs text-slate-500">/mo</span></div>
+    <ul class="text-xs text-slate-400 mt-3 space-y-1 flex-1">
+      <li>{{ p.max_mt5_accounts }} MT5 account{{ 's' if p.max_mt5_accounts != 1 }}</li>
+      {% for f in p.features %}<li>{{ f }}</li>{% endfor %}
+    </ul>
+    {% if plan and plan.id == p.id %}
+    <div class="mt-4 text-center text-xs text-brand font-bold">CURRENT</div>
+    {% else %}
+    <form method="post" action="/subscription/subscribe" class="mt-4">
+      <input type="hidden" name="plan_slug" value="{{ p.slug }}">
+      <input name="coupon" placeholder="Coupon" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-2 py-1 text-xs mb-2">
+      <button class="w-full bg-brand hover:bg-brand-dark text-slate-950 font-bold py-1.5 rounded-lg text-sm">
+        {{ 'Upgrade' if p.price_monthly > (plan.price_monthly if plan else 0) else 'Switch' }}</button>
+    </form>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+
+<h3 class="font-semibold text-white mb-3">Invoices</h3>
+<div class="bg-slate-900 border border-slate-800 rounded-xl overflow-x-auto">
+<table class="data w-full">
+<tr><th>Number</th><th>Date</th><th>Description</th><th>Amount</th><th>Status</th></tr>
+{% for i in invoices %}
+<tr class="cursor-pointer" onclick="location='/invoices/{{ i.id }}'">
+  <td class="font-mono">{{ i.number }}</td><td>{{ i.created_at.strftime('%Y-%m-%d') }}</td>
+  <td>{{ i.description }}</td><td>{{ i.amount|money }}</td><td>{{ status_badge(i.status) }}</td></tr>
+{% else %}<tr><td colspan="5" class="text-center text-slate-500 py-6">No invoices.</td></tr>{% endfor %}
+</table>
+</div>
+{% endblock %}

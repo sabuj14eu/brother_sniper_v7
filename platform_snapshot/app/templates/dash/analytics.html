@@ -1,0 +1,51 @@
+{% extends "dash/_base.html" %}
+{% from "_macros.html" import stat %}
+{% block content %}
+<h1 class="text-2xl font-bold text-white mb-6">Analytics</h1>
+<div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+  {{ stat('Best Symbol', report.best_symbol or '—') }}
+  {{ stat('Worst Symbol', report.worst_symbol or '—') }}
+  {{ stat('Best Session', (report.best_session or '—')|title) }}
+  {{ stat('Worst Session', (report.worst_session or '—')|title) }}
+  {{ stat('Best Day', report.best_day or '—') }}
+  {{ stat('Worst Day', report.worst_day or '—') }}
+  {{ stat('Monthly Profit', report.monthly_profit|money, tone='good' if report.monthly_profit >= 0 else 'bad') }}
+  {{ stat('Total Profit', report.total_profit|money, tone='good' if report.total_profit >= 0 else 'bad') }}
+</div>
+
+<div class="grid lg:grid-cols-2 gap-6">
+  <div class="bg-slate-900 border border-slate-800 rounded-xl p-4">
+    <h3 class="font-semibold text-white mb-3">Monthly returns</h3>
+    <canvas id="monthlyChart" height="140"></canvas>
+  </div>
+  <div class="bg-slate-900 border border-slate-800 rounded-xl p-4">
+    <h3 class="font-semibold text-white mb-3">Profit by symbol</h3>
+    <canvas id="symbolChart" height="140"></canvas>
+  </div>
+  <div class="bg-slate-900 border border-slate-800 rounded-xl p-4">
+    <h3 class="font-semibold text-white mb-3">Profit by session</h3>
+    <canvas id="sessionChart" height="140"></canvas>
+  </div>
+  <div class="bg-slate-900 border border-slate-800 rounded-xl p-4">
+    <h3 class="font-semibold text-white mb-3">Profit by weekday</h3>
+    <canvas id="dayChart" height="140"></canvas>
+  </div>
+</div>
+
+<script>
+const opts = { plugins: { legend: { display: false } },
+  scales: { x: { ticks: { color: '#64748b' }, grid: { display: false } },
+            y: { grid: { color: '#1e293b' }, ticks: { color: '#64748b' } } } };
+function bar(id, data) {
+  const labels = Object.keys(data), values = Object.values(data);
+  new Chart(document.getElementById(id), { type: 'bar',
+    data: { labels, datasets: [{ data: values,
+      backgroundColor: values.map(v => v >= 0 ? 'rgba(34,197,94,.7)' : 'rgba(244,63,94,.7)') }] },
+    options: opts });
+}
+bar('monthlyChart', {{ report.monthly_returns|tojson }});
+bar('symbolChart', {{ report.by_symbol|tojson }});
+bar('sessionChart', {{ report.by_session|tojson }});
+bar('dayChart', {{ report.by_weekday|tojson }});
+</script>
+{% endblock %}

@@ -1,0 +1,60 @@
+{% extends "dash/_base.html" %}
+{% from "_macros.html" import field, badge %}
+{% block content %}
+<h1 class="text-2xl font-bold text-white mb-6">API Access</h1>
+{% if new_key %}
+<div class="bg-emerald-500/10 border border-emerald-500/40 rounded-xl p-4 mb-6">
+  <div class="text-emerald-300 font-semibold mb-1">New API key — copy it now, it won't be shown again:</div>
+  <code class="text-sm bg-slate-900 rounded px-2 py-1 break-all">{{ new_key }}</code>
+</div>
+{% endif %}
+<div class="grid lg:grid-cols-3 gap-6">
+<div class="lg:col-span-2">
+  <h3 class="font-semibold text-white mb-3">API keys</h3>
+  <div class="bg-slate-900 border border-slate-800 rounded-xl overflow-x-auto">
+  <table class="data w-full">
+  <tr><th>Label</th><th>Prefix</th><th>Permissions</th><th>Last used</th><th></th></tr>
+  {% for k in keys %}
+  <tr>
+    <td class="font-medium">{{ k.label }}</td><td class="font-mono">{{ k.prefix }}…</td>
+    <td>{{ k.permissions|join(', ') }}</td>
+    <td>{{ k.last_used_at.strftime('%Y-%m-%d %H:%M') if k.last_used_at else 'never' }}</td>
+    <td>{% if k.active %}
+      <form method="post" action="/api-access/keys/{{ k.id }}/revoke">
+        <button class="text-rose-400 hover:text-rose-300 text-xs">revoke</button></form>
+      {% else %}{{ badge('revoked','red') }}{% endif %}</td>
+  </tr>
+  {% else %}<tr><td colspan="5" class="text-center text-slate-500 py-6">No API keys yet.</td></tr>{% endfor %}
+  </table>
+  </div>
+
+  <h3 class="font-semibold text-white mt-8 mb-3">Webhook / API logs</h3>
+  <div class="bg-slate-900 border border-slate-800 rounded-xl overflow-x-auto">
+  <table class="data w-full">
+  <tr><th>Time</th><th>Source</th><th>Endpoint</th><th>Status</th></tr>
+  {% for l in logs %}
+  <tr><td>{{ l.created_at.strftime('%m-%d %H:%M') }}</td><td>{{ l.source }}</td>
+    <td class="font-mono text-xs">{{ l.endpoint }}</td><td>{{ l.status_code }}</td></tr>
+  {% else %}<tr><td colspan="4" class="text-center text-slate-500 py-6">No webhook activity.</td></tr>{% endfor %}
+  </table>
+  </div>
+</div>
+<div class="bg-slate-900 border border-slate-800 rounded-xl p-5 h-fit">
+  <h3 class="font-semibold text-white mb-4">Create key</h3>
+  <form method="post" action="/api-access/keys/new">
+    {{ field('label', 'Label', placeholder='VPS agent') }}
+    <label class="block mb-4"><span class="text-sm text-slate-400">Permissions</span>
+      <select name="permissions" class="mt-1 w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm">
+        <option value="read">Read only</option>
+        <option value="write">Read + heartbeat write</option>
+      </select></label>
+    <button class="w-full bg-brand hover:bg-brand-dark text-slate-950 font-bold py-2 rounded-xl">Generate</button>
+  </form>
+  <div class="text-xs text-slate-500 mt-4 space-y-1">
+    <p>Use: <code class="bg-slate-800 px-1 rounded">Authorization: Bearer bb_…</code></p>
+    <p>REST base: <code class="bg-slate-800 px-1 rounded">/api/v1</code>{% if not settings.is_production %} · <a class="text-brand" href="/api/docs">interactive docs</a>{% endif %}</p>
+    <p>TradingView alerts go to the brain, never here — this API is read + heartbeat only.</p>
+  </div>
+</div>
+</div>
+{% endblock %}

@@ -1,0 +1,21 @@
+{% extends "dash/_base.html" %}
+{% from "_macros.html" import status_badge, pnl, pagination %}
+{% block content %}
+<h1 class="text-2xl font-bold text-white mb-6">Trade Journal <span class="text-sm text-slate-500 font-normal">({{ total }})</span></h1>
+<div class="bg-slate-900 border border-slate-800 rounded-xl overflow-x-auto">
+<table class="data w-full">
+<tr><th>Opened</th><th>Symbol</th><th>Dir</th><th>Lots</th><th>Entry</th><th>Exit</th><th>RR</th><th>Net P/L</th><th>Duration</th><th>Emotion</th><th>Status</th></tr>
+{% for t in trades %}
+<tr class="cursor-pointer" onclick="location='/journal/{{ t.id }}'">
+  <td>{{ t.open_time.strftime('%m-%d %H:%M') }}</td><td class="font-semibold">{{ t.symbol }}</td>
+  <td class="{{ 'text-emerald-400' if t.direction=='BUY' else 'text-rose-400' }}">{{ t.direction }}</td>
+  <td>{{ t.lots }}</td><td>{{ t.entry_price }}</td><td>{{ t.exit_price or '—' }}</td>
+  <td>{{ t.rr or '—' }}</td><td>{{ pnl(t.net_profit) }}</td>
+  <td>{{ (t.duration_minutes ~ ' min') if t.duration_minutes is not none else '—' }}</td>
+  <td>{{ t.emotion or '—' }}</td><td>{{ status_badge(t.status) }}</td>
+</tr>
+{% else %}<tr><td colspan="11" class="text-center text-slate-500 py-8">No trades yet.</td></tr>{% endfor %}
+</table>
+</div>
+{{ pagination(page, pages, '/journal?') }}
+{% endblock %}

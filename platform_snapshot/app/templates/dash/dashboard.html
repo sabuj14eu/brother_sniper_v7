@@ -1,0 +1,148 @@
+{% extends "dash/_base.html" %}
+{% from "_macros.html" import stat, badge, status_badge, pnl %}
+{% block content %}
+<div class="flex items-center justify-between mb-6">
+  <div>
+    <h1 class="text-2xl font-bold text-white">Dashboard</h1>
+    <p class="text-sm text-slate-500">Welcome back, {{ user.display_name }} · {{ now.strftime('%Y-%m-%d %H:%M') }} UTC</p>
+  </div>
+  <div class="flex gap-2 text-xs">
+    {{ badge('Verified ✓' if user.is_verified else 'Unverified ✗', 'green' if user.is_verified else 'red') }}
+    {{ badge('Telegram ✓' if telegram_ok else 'Telegram ✗', 'green' if telegram_ok else 'slate') }}
+    {{ badge('MT5 ' ~ portfolio.online ~ '/' ~ portfolio.accounts, 'green' if portfolio.online else 'red') }}
+    {{ badge(plan.name if plan else 'Free', 'blue') }}
+    {{ badge('VPS ✓' if vps and vps.ea_running else 'VPS ✗', 'green' if vps and vps.ea_running else 'slate') }}
+  </div>
+</div>
+
+<!-- Portfolio -->
+<div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+  {{ stat('Total Balance', portfolio.balance|money) }}
+  {{ stat('Equity', portfolio.equity|money) }}
+  {{ stat('Free Margin', portfolio.free_margin|money) }}
+  {{ stat('Floating P/L', portfolio.floating_pnl|money, tone='good' if portfolio.floating_pnl >= 0 else 'bad') }}
+  {{ stat("Today's Profit", report.today_profit|money, tone='good' if report.today_profit >= 0 else 'bad') }}
+  {{ stat('Weekly Profit', report.weekly_profit|money, tone='good' if report.weekly_profit >= 0 else 'bad') }}
+  {{ stat('Monthly Profit', report.monthly_profit|money, tone='good' if report.monthly_profit >= 0 else 'bad') }}
+  {{ stat('Total Profit', report.total_profit|money, tone='good' if report.total_profit >= 0 else 'bad') }}
+</div>
+
+<!-- Trading stats -->
+<div class="grid grid-cols-2 md:grid-cols-6 gap-3 mb-6">
+  {{ stat('Win Rate', report.win_rate ~ '%', report.wins ~ 'W / ' ~ report.losses ~ 'L') }}
+  {{ stat('Profit Factor', report.profit_factor if report.profit_factor is not none else '∞') }}
+  {{ stat('Expectancy', report.expectancy|money) }}
+  {{ stat('Avg RR', report.avg_rr or '—') }}
+  {{ stat('Max Drawdown', report.max_drawdown ~ '%', tone='bad' if report.max_drawdown > 10 else '') }}
+  {{ stat('Closed Trades', report.count) }}
+</div>
+
+<div class="grid lg:grid-cols-3 gap-6">
+  <!-- Equity curve -->
+  <div class="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-xl p-4">
+    <h3 class="font-semibold text-white mb-3">Equity curve</h3>
+    <canvas id="equityChart" height="90"></canvas>
+  </div>
+
+  <!-- AI market bias -->
+  <div class="bg-slate-900 border border-slate-800 rounded-xl p-4">
+    <h3 class="font-semibold text-white mb-3">🧠 AI Market Bias</h3>
+    <div class="space-y-2 text-sm">
+    {% for sym in bias_symbols %}
+      {% set b = biases.get(sym) %}
+      <div class="flex items-center justify-between">
+        <span class="font-medium">{{ sym }}</span>
+        {% if b %}
+        <span class="flex items-center gap-2">
+          {{ badge(b.trend, 'green' if b.trend=='bullish' else 'red' if b.trend=='bearish' else 'slate') }}
+          <span class="text-slate-500 text-xs">{{ b.confidence|round|int }}%</span>
+        </span>
+        {% else %}<span class="text-slate-600 text-xs">no data</span>{% endif %}
+      </div>
+    {% endfor %}
+    </div>
+  </div>
+</div>
+
+<div class="grid lg:grid-cols-3 gap-6 mt-6">
+  <!-- Open trades -->
+  <div class="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-xl p-4">
+    <h3 class="font-semibold text-white mb-3">Open trades ({{ open_trades|length }}) · Pending ({{ pending_orders|length }})</h3>
+    <div class="overflow-x-auto"><table class="data w-full">
+      <tr><th>Symbol</th><th>Dir</th><th>Lots</th><th>Entry</th><th>SL</th><th>TP</th><th>P/L</th><th>Status</th></tr>
+      {% for t in open_trades + pending_orders %}
+      <tr><td class="font-semibold">{{ t.symbol }}</td>
+        <td class="{{ 'text-emerald-400' if t.direction=='BUY' else 'text-rose-400' }}">{{ t.direction }}</td>
+        <td>{{ t.lots }}</td><td>{{ t.entry_price }}</td><td>{{ t.sl or '—' }}</td><td>{{ t.tp or '—' }}</td>
+        <td>{{ pnl(t.profit) }}</td><td>{{ status_badge(t.status) }}</td></tr>
+      {% else %}
+      <tr><td colspan="8" class="text-center text-slate-500 py-6">No open trades.</td></tr>
+      {% endfor %}
+    </table></div>
+  </div>
+
+  <!-- Economic news -->
+  <div class="bg-slate-900 border border-slate-800 rounded-xl p-4">
+    <h3 class="font-semibold text-white mb-3">📰 Upcoming news</h3>
+    <div class="space-y-3 text-sm">
+    {% for e in news %}
+      <div>
+        <div class="flex justify-between">
+          <span class="font-medium">{{ e.title }}</span>
+          {{ badge(e.impact, 'red' if e.impact=='high' else 'yellow' if e.impact=='medium' else 'slate') }}
+        </div>
+        <div class="text-xs text-slate-500">{{ e.event_time.strftime('%a %H:%M') }} UTC · {{ e.currency }}
+          {% if e.affected_symbols %}· {{ e.affected_symbols|join(', ') }}{% endif %}</div>
+      </div>
+    {% else %}<div class="text-slate-500">No upcoming events.</div>{% endfor %}
+    </div>
+  </div>
+</div>
+
+<div class="grid lg:grid-cols-3 gap-6 mt-6">
+  <!-- Latest signals -->
+  <div class="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-xl p-4">
+    <h3 class="font-semibold text-white mb-3">📡 Latest signals <a href="/signals" class="text-xs text-brand float-right">all →</a></h3>
+    <div class="overflow-x-auto"><table class="data w-full">
+      <tr><th>Time</th><th>Symbol</th><th>Dir</th><th>Council</th><th>Conf.</th><th>Status</th></tr>
+      {% for s in signals %}
+      <tr class="cursor-pointer" onclick="location='/signals/{{ s.id }}'">
+        <td>{{ s.created_at.strftime('%m-%d %H:%M') }}</td><td class="font-semibold">{{ s.symbol }}</td>
+        <td class="{{ 'text-emerald-400' if s.direction=='BUY' else 'text-rose-400' }}">{{ s.direction }}</td>
+        <td>{{ s.council_votes.get('approve','—') }}/{{ s.council_votes.get('total','—') }}</td>
+        <td>{{ (s.confidence|round|int ~ '%') if s.confidence else '—' }}</td>
+        <td>{{ status_badge(s.status) }}</td></tr>
+      {% else %}<tr><td colspan="6" class="text-center text-slate-500 py-6">No signals yet.</td></tr>{% endfor %}
+    </table></div>
+  </div>
+
+  <!-- Notifications -->
+  <div class="bg-slate-900 border border-slate-800 rounded-xl p-4">
+    <h3 class="font-semibold text-white mb-3">🔔 Notifications
+      {% if unread %}<span class="text-xs bg-rose-500 text-white rounded-full px-2">{{ unread }}</span>{% endif %}
+      <form method="post" action="/notifications/read-all" class="float-right">
+        <button class="text-xs text-slate-500 hover:text-white">mark read</button></form>
+    </h3>
+    <div class="space-y-2 text-sm max-h-72 overflow-y-auto">
+    {% for n in notifications %}
+      <div class="{{ 'opacity-60' if n.read }}">
+        <div class="font-medium">{{ n.title }}</div>
+        <div class="text-xs text-slate-500">{{ n.created_at.strftime('%m-%d %H:%M') }} · {{ n.type }}</div>
+      </div>
+    {% else %}<div class="text-slate-500">Nothing yet.</div>{% endfor %}
+    </div>
+  </div>
+</div>
+
+<script>
+const curve = {{ report.equity_curve|tojson }};
+new Chart(document.getElementById('equityChart'), {
+  type: 'line',
+  data: { labels: curve.map(p => p.t),
+    datasets: [{ data: curve.map(p => p.balance), borderColor: '#22c55e',
+      backgroundColor: 'rgba(34,197,94,.08)', fill: true, tension: .3, pointRadius: 0 }] },
+  options: { plugins: { legend: { display: false } },
+    scales: { x: { display: false }, y: { grid: { color: '#1e293b' }, ticks: { color: '#64748b' } } } }
+});
+</script>
+{% endblock %}

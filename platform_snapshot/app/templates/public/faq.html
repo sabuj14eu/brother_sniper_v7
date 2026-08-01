@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}FAQ — {{ app_name }}{% endblock %}
+{% block content %}
+<div class="max-w-3xl mx-auto px-4 py-16">
+<h1 class="text-4xl font-extrabold text-white mb-10">Frequently asked questions</h1>
+{% for item in items %}
+<details class="bg-slate-900 border border-slate-800 rounded-xl p-5 mb-3">
+  <summary class="font-semibold text-white cursor-pointer">{{ item.title }}</summary>
+  <p class="text-slate-400 text-sm mt-3 whitespace-pre-line">{{ item.body }}</p>
+</details>
+{% else %}
+<p class="text-slate-500">FAQ entries are being written — check back soon or <a class="text-brand" href="/contact">contact us</a>.</p>
+{% endfor %}
+</div>
+{% endblock %}

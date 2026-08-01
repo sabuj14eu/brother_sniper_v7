@@ -1,0 +1,42 @@
+{% extends "admin/_base.html" %}
+{% from "_macros.html" import badge %}
+{% block content %}
+<h1 class="text-2xl font-bold text-white mb-1">AI Control Panel</h1>
+<p class="text-sm text-slate-500 mb-6">These values are read by the v18 brain. Every change is audited — risk knobs are never turned silently.</p>
+
+{% if values.ai_emergency_disable == 'on' %}
+<div class="bg-rose-500/10 border border-rose-500/50 rounded-xl p-4 mb-6 text-rose-300 font-semibold">
+  🛑 AI EMERGENCY DISABLE IS ACTIVE — the council approves nothing.</div>
+{% endif %}
+
+<form method="post" action="/admin/ai/save" class="bg-slate-900 border border-slate-800 rounded-xl p-6 max-w-2xl">
+  <div class="grid md:grid-cols-2 gap-4">
+  {% for key, default, label in settings_def %}
+    <label class="block"><span class="text-sm text-slate-400">{{ label }}</span>
+    {% if values[key] in ['on','off'] %}
+      <select name="{{ key }}" class="mt-1 w-full bg-slate-800 border {{ 'border-rose-500' if key=='ai_emergency_disable' and values[key]=='on' else 'border-slate-700' }} rounded-lg px-3 py-2 text-sm">
+        <option value="on" {{ 'selected' if values[key]=='on' }}>On</option>
+        <option value="off" {{ 'selected' if values[key]=='off' }}>Off</option>
+      </select>
+    {% else %}
+      <input name="{{ key }}" value="{{ values[key] }}" class="mt-1 w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm">
+    {% endif %}
+    </label>
+  {% endfor %}
+  </div>
+  <button class="mt-5 bg-brand hover:bg-brand-dark text-slate-950 font-bold px-6 py-2 rounded-xl">Save AI settings</button>
+</form>
+
+<h3 class="font-semibold text-white mt-8 mb-3">Current market bias (from brain)</h3>
+<div class="bg-slate-900 border border-slate-800 rounded-xl overflow-x-auto max-w-2xl">
+<table class="data w-full">
+<tr><th>Symbol</th><th>Trend</th><th>Confidence</th><th>Council decision</th><th>Risk</th><th>Updated</th></tr>
+{% for b in biases %}
+<tr><td class="font-semibold">{{ b.symbol }}</td>
+  <td>{{ badge(b.trend, 'green' if b.trend=='bullish' else 'red' if b.trend=='bearish' else 'slate') }}</td>
+  <td>{{ b.confidence|round|int }}%</td><td>{{ b.council_decision }}</td><td>{{ b.risk_level }}</td>
+  <td>{{ b.updated_at.strftime('%m-%d %H:%M') }}</td></tr>
+{% else %}<tr><td colspan="6" class="text-center text-slate-500 py-6">No bias data received.</td></tr>{% endfor %}
+</table>
+</div>
+{% endblock %}

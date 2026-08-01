@@ -1,0 +1,43 @@
+{% extends "dash/_base.html" %}
+{% from "_macros.html" import status_badge, field %}
+{% block content %}
+<h1 class="text-2xl font-bold text-white mb-6">Support</h1>
+<div class="grid lg:grid-cols-3 gap-6">
+<div class="lg:col-span-2">
+  <h3 class="font-semibold text-white mb-3">Your tickets</h3>
+  <div class="bg-slate-900 border border-slate-800 rounded-xl overflow-x-auto">
+  <table class="data w-full">
+  <tr><th>Subject</th><th>Category</th><th>Updated</th><th>Status</th></tr>
+  {% for t in tickets %}
+  <tr class="cursor-pointer" onclick="location='/support/{{ t.id }}'">
+    <td class="font-medium">{{ t.subject }}</td><td>{{ t.category|replace('_',' ') }}</td>
+    <td>{{ t.updated_at.strftime('%Y-%m-%d %H:%M') }}</td><td>{{ status_badge(t.status) }}</td></tr>
+  {% else %}<tr><td colspan="4" class="text-center text-slate-500 py-6">No tickets.</td></tr>{% endfor %}
+  </table>
+  </div>
+  {% if kb %}
+  <h3 class="font-semibold text-white mt-8 mb-3">Knowledge base</h3>
+  {% for d in kb %}
+  <a href="/blog/{{ d.slug }}" class="block text-sm text-slate-400 hover:text-white py-1">📄 {{ d.title }}</a>
+  {% endfor %}
+  {% endif %}
+</div>
+<div class="bg-slate-900 border border-slate-800 rounded-xl p-5 h-fit">
+  <h3 class="font-semibold text-white mb-4">New ticket</h3>
+  <form method="post" action="/support/new">
+    {{ field('subject', 'Subject', required=True) }}
+    <label class="block mb-3"><span class="text-sm text-slate-400">Category</span>
+      <select name="category" class="mt-1 w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm">
+        <option value="support">General support</option>
+        <option value="bug">Bug report</option>
+        <option value="feature">Feature request</option>
+        <option value="billing">Billing</option>
+        <option value="remote_assistance">Remote assistance request</option>
+      </select></label>
+    <label class="block mb-4"><span class="text-sm text-slate-400">Message</span>
+      <textarea name="body" rows="5" required class="mt-1 w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm"></textarea></label>
+    <button class="w-full bg-brand hover:bg-brand-dark text-slate-950 font-bold py-2 rounded-xl">Submit</button>
+  </form>
+</div>
+</div>
+{% endblock %}

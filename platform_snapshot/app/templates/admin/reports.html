@@ -1,0 +1,20 @@
+{% extends "admin/_base.html" %}
+{% from "_macros.html" import stat %}
+{% block content %}
+<h1 class="text-2xl font-bold text-white mb-6">Reports</h1>
+<div class="flex gap-2 mb-6 text-sm">
+  {% for w in ['daily','weekly','monthly','yearly'] %}
+  <a href="/admin/reports?window={{ w }}"
+     class="px-4 py-1.5 rounded-lg {{ 'bg-slate-700' if window==w else 'bg-slate-900 border border-slate-800' }}">{{ w|title }}</a>
+  {% endfor %}
+</div>
+<div class="grid grid-cols-2 md:grid-cols-3 gap-3 max-w-3xl">
+  {{ stat('Closed trades', trades) }}
+  {{ stat('Wins', wins, tone='good') }}
+  {{ stat('Trading profit', profit|money, tone='good' if profit >= 0 else 'bad') }}
+  {{ stat('Revenue', revenue|money, tone='good') }}
+  {{ stat('New users', new_users) }}
+  {{ stat('Signals', signals) }}
+</div>
+<p class="text-sm text-slate-500 mt-6">Window: {{ window }}. User/broker/trading/revenue breakdowns feed off the same tables — export tooling lands with the reporting worker.</p>
+{% endblock %}

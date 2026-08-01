@@ -1,0 +1,34 @@
+{% extends "admin/_base.html" %}
+{% from "_macros.html" import field, status_badge %}
+{% block content %}
+<h1 class="text-2xl font-bold text-white mb-1">Server Management</h1>
+<p class="text-sm text-slate-500 mb-6">Status comes from node heartbeats (Iron Rule: green endpoints prove nothing).</p>
+<div class="grid lg:grid-cols-3 gap-6">
+<div class="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-xl overflow-x-auto">
+<table class="data w-full">
+<tr><th>Node</th><th>Role</th><th>Status</th><th>Metrics</th><th>Last heartbeat</th></tr>
+{% for n in nodes %}
+<tr>
+  <td class="font-semibold">{{ n.name }}</td><td class="uppercase text-xs">{{ n.role }}</td>
+  <td>{{ status_badge(n.status) }}</td>
+  <td class="text-xs">{% for k, v in n.metrics.items() %}{{ k }}={{ v }} {% endfor %}</td>
+  <td>{{ n.last_heartbeat_at.strftime('%m-%d %H:%M:%S') if n.last_heartbeat_at else 'never' }}</td>
+</tr>
+{% else %}<tr><td colspan="5" class="text-center text-slate-500 py-6">No nodes registered.</td></tr>{% endfor %}
+</table>
+</div>
+<div class="bg-slate-900 border border-slate-800 rounded-xl p-5 h-fit">
+  <h3 class="font-semibold text-white mb-4">Register node</h3>
+  <form method="post" action="/admin/servers/save">
+    {{ field('name', 'Node name', placeholder='contabo-1', required=True) }}
+    <label class="block mb-4"><span class="text-sm text-slate-400">Role</span>
+      <select name="role" class="mt-1 w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm">
+        {% for r in ['app','trading','redis','database','storage','queue','worker','cron'] %}
+        <option>{{ r }}</option>{% endfor %}
+      </select></label>
+    <button class="w-full bg-brand hover:bg-brand-dark text-slate-950 font-bold py-2 rounded-xl">Register</button>
+  </form>
+  <p class="text-xs text-slate-500 mt-4">Backups & restore run via the ops runbook (deploy ceremony: backup → migrate → restart → verify logs).</p>
+</div>
+</div>
+{% endblock %}

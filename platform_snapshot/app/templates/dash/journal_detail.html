@@ -1,0 +1,40 @@
+{% extends "dash/_base.html" %}
+{% from "_macros.html" import status_badge, pnl, field %}
+{% block content %}
+<a href="/journal" class="text-sm text-brand">← Trade journal</a>
+<h1 class="text-2xl font-bold text-white mt-2 mb-6">
+  <span class="{{ 'text-emerald-400' if t.direction=='BUY' else 'text-rose-400' }}">{{ t.direction }}</span>
+  {{ t.symbol }} · {{ t.lots }} lots {{ status_badge(t.status) }}
+</h1>
+<div class="grid lg:grid-cols-2 gap-6">
+<div class="bg-slate-900 border border-slate-800 rounded-xl p-5">
+  <table class="data w-full">
+    {% for k, v in [('Ticket', t.ticket or '—'),('Entry', t.entry_price),('Exit', t.exit_price or '—'),
+                    ('SL', t.sl or '—'),('TP', t.tp or '—'),('RR', t.rr or '—'),('Session', t.session or '—'),
+                    ('Profit', t.profit),('Commission', t.commission),('Swap', t.swap),
+                    ('Opened', t.open_time.strftime('%Y-%m-%d %H:%M UTC')),
+                    ('Closed', t.close_time.strftime('%Y-%m-%d %H:%M UTC') if t.close_time else '—'),
+                    ('Duration', (t.duration_minutes ~ ' min') if t.duration_minutes is not none else '—')] %}
+    <tr><td class="text-slate-500 w-36">{{ k }}</td><td class="font-medium">{{ v }}</td></tr>
+    {% endfor %}
+    <tr><td class="text-slate-500">Net P/L</td><td class="font-bold">{{ pnl(t.net_profit) }}</td></tr>
+  </table>
+</div>
+<div class="bg-slate-900 border border-slate-800 rounded-xl p-5">
+  <h3 class="font-semibold text-white mb-3">Journal notes</h3>
+  <form method="post" action="/journal/{{ t.id }}/notes">
+    <label class="block mb-3"><span class="text-sm text-slate-400">Notes</span>
+      <textarea name="notes" rows="4" class="mt-1 w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm">{{ t.notes }}</textarea></label>
+    <label class="block mb-3"><span class="text-sm text-slate-400">Emotion</span>
+      <select name="emotion" class="mt-1 w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm">
+        <option value="">—</option>
+        {% for e in ['calm','confident','fearful','greedy','revenge','fomo','disciplined'] %}
+        <option value="{{ e }}" {{ 'selected' if t.emotion==e }}>{{ e|title }}</option>{% endfor %}
+      </select></label>
+    {{ field('screenshot_url', 'Screenshot URL', value=t.screenshot_url) }}
+    <button class="bg-brand hover:bg-brand-dark text-slate-950 font-bold px-5 py-2 rounded-xl">Save notes</button>
+  </form>
+  {% if t.screenshot_url %}<img src="{{ t.screenshot_url }}" class="mt-4 rounded-lg border border-slate-700" alt="screenshot">{% endif %}
+</div>
+</div>
+{% endblock %}

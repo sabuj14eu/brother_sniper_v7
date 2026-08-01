@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% from "_macros.html" import field %}
+{% block title %}Login — {{ app_name }}{% endblock %}
+{% block content %}
+<div class="max-w-md mx-auto px-4 py-16">
+<h1 class="text-3xl font-extrabold text-white mb-6">Welcome back</h1>
+{% if error %}<div class="bg-rose-500/10 border border-rose-500/40 text-rose-300 rounded-xl p-3 mb-4 text-sm">{{ error }}</div>{% endif %}
+<form method="post" action="/login{% if next %}?next={{ next }}{% endif %}" class="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+  {{ field('phone', 'Email or phone number', value=phone|default(''), placeholder='you@example.com', required=True) }}
+  {{ field('password', 'Password', type='password', required=True) }}
+  {% if needs_totp %}
+  <div class="bg-sky-500/10 border border-sky-500/30 rounded-lg p-3 mb-3 text-sm text-sky-300">Two-factor authentication is enabled on this account.</div>
+  {{ field('totp', '2FA code (Google Authenticator)', placeholder='123456', required=True) }}
+  {% endif %}
+  <button class="w-full bg-brand hover:bg-brand-dark text-slate-950 font-bold py-2.5 rounded-xl">Login</button>
+</form>
+<div class="flex justify-between text-sm mt-4">
+  <a class="text-slate-500 hover:text-white" href="/forgot">Forgot password?</a>
+  <a class="text-brand" href="/register">Create account</a>
+</div>
+</div>
+{% endblock %}

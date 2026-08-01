@@ -1,0 +1,62 @@
+{% extends "admin/_base.html" %}
+{% from "_macros.html" import badge %}
+{% block content %}
+<h1 class="text-2xl font-bold text-white mb-6">CMS</h1>
+<div class="flex gap-2 mb-4 flex-wrap text-sm">
+  <a href="/admin/cms" class="px-3 py-1.5 rounded-lg {{ 'bg-slate-700' if not current_type else 'bg-slate-900 border border-slate-800' }}">All</a>
+  {% for t in types %}
+  <a href="/admin/cms?type={{ t }}" class="px-3 py-1.5 rounded-lg {{ 'bg-slate-700' if current_type==t else 'bg-slate-900 border border-slate-800' }}">{{ t|title }}</a>
+  {% endfor %}
+</div>
+<div class="grid lg:grid-cols-3 gap-6">
+<div class="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-xl overflow-x-auto">
+<table class="data w-full">
+<tr><th>Type</th><th>Title</th><th>Slug</th><th>Status</th><th>Updated</th><th></th></tr>
+{% for p in posts %}
+<tr>
+  <td>{{ badge(p.type, 'blue') }}</td><td class="font-medium">{{ p.title }}</td>
+  <td class="font-mono text-xs">{{ p.slug }}</td>
+  <td>{{ badge('published','green') if p.published else badge('draft','yellow') }}</td>
+  <td>{{ p.updated_at.strftime('%Y-%m-%d') }}</td>
+  <td class="flex gap-2">
+    <button class="text-xs text-sky-400" onclick='editPost({{ {"id": p.id, "type": p.type, "title": p.title, "slug": p.slug, "body": p.body, "published": p.published}|tojson }})'>edit</button>
+    <form method="post" action="/admin/cms/{{ p.id }}/delete" onsubmit="return confirm('Delete?')">
+      <button class="text-xs text-rose-400">delete</button></form>
+  </td>
+</tr>
+{% else %}<tr><td colspan="6" class="text-center text-slate-500 py-6">No content.</td></tr>{% endfor %}
+</table>
+</div>
+<div class="bg-slate-900 border border-slate-800 rounded-xl p-5 h-fit">
+  <h3 class="font-semibold text-white mb-4" id="form-title">New content</h3>
+  <form method="post" action="/admin/cms/save" id="cms-form">
+    <input type="hidden" name="post_id" id="f-id" value="0">
+    <label class="block mb-3"><span class="text-sm text-slate-400">Type</span>
+      <select name="type" id="f-type" class="mt-1 w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm">
+        {% for t in types %}<option value="{{ t }}">{{ t|title }}</option>{% endfor %}
+      </select></label>
+    <label class="block mb-3"><span class="text-sm text-slate-400">Title</span>
+      <input name="title" id="f-title" required class="mt-1 w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm"></label>
+    <label class="block mb-3"><span class="text-sm text-slate-400">Slug (blank = auto)</span>
+      <input name="slug" id="f-slug" class="mt-1 w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm"></label>
+    <label class="block mb-3"><span class="text-sm text-slate-400">Body</span>
+      <textarea name="body" id="f-body" rows="8" class="mt-1 w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm"></textarea></label>
+    <label class="flex items-center gap-2 text-sm mb-4">
+      <input type="checkbox" name="published" id="f-published" value="1" class="accent-emerald-500"> Published</label>
+    <button class="w-full bg-brand hover:bg-brand-dark text-slate-950 font-bold py-2 rounded-xl">Save</button>
+  </form>
+</div>
+</div>
+<script>
+function editPost(p) {
+  document.getElementById('form-title').textContent = 'Edit: ' + p.title;
+  document.getElementById('f-id').value = p.id;
+  document.getElementById('f-type').value = p.type;
+  document.getElementById('f-title').value = p.title;
+  document.getElementById('f-slug').value = p.slug;
+  document.getElementById('f-body').value = p.body;
+  document.getElementById('f-published').checked = p.published;
+  window.scrollTo({top: 0, behavior: 'smooth'});
+}
+</script>
+{% endblock %}

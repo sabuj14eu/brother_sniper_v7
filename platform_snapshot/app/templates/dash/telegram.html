@@ -1,0 +1,38 @@
+{% extends "dash/_base.html" %}
+{% from "_macros.html" import field, toggle, badge %}
+{% block content %}
+<h1 class="text-2xl font-bold text-white mb-1">Telegram
+  {{ badge('connected' if tg and tg.verified else 'not connected', 'green' if tg and tg.verified else 'slate') }}</h1>
+<p class="text-sm text-slate-500 mb-6">Create a bot with @BotFather, paste its token, and set your chat ID.</p>
+{% if msg %}<div class="bg-sky-500/10 border border-sky-500/30 text-sky-300 rounded-xl p-3 mb-4 text-sm">{{ msg }}</div>{% endif %}
+
+<div class="grid lg:grid-cols-2 gap-6">
+<div class="bg-slate-900 border border-slate-800 rounded-xl p-5">
+  <h3 class="font-semibold text-white mb-4">Connection</h3>
+  <form method="post" action="/telegram/save">
+    {{ field('bot_token', 'Bot token' + (' (saved — enter to replace)' if tg and tg.bot_token_enc else ''), type='password', placeholder='123456:ABC…') }}
+    {{ field('chat_id', 'Chat ID', value=tg.chat_id if tg else '', placeholder='-1001234567890') }}
+    <button class="bg-brand hover:bg-brand-dark text-slate-950 font-bold px-5 py-2 rounded-xl">Save</button>
+  </form>
+  <form method="post" action="/telegram/test" class="mt-3">
+    <button class="border border-slate-700 hover:border-slate-500 px-5 py-2 rounded-xl text-sm">Send test message</button>
+  </form>
+</div>
+
+<div class="bg-slate-900 border border-slate-800 rounded-xl p-5">
+  <h3 class="font-semibold text-white mb-4">Event notifications</h3>
+  <form method="post" action="/telegram/events" class="grid grid-cols-2 gap-x-4">
+    {% set labels = {'buy':'✅ Buy','sell':'✅ Sell','pending':'Pending orders','close':'Close','partial_close':'Partial close',
+                     'tp':'Take profit','sl':'Stop loss','daily_report':'Daily report','weekly_report':'Weekly report',
+                     'monthly_report':'Monthly report','news_alert':'News alerts','system_alert':'System alerts',
+                     'subscription_reminder':'Subscription reminders'} %}
+    {% for key, label in labels.items() %}
+      {{ toggle(key, tg.events.get(key, True) if tg else True, label) }}
+    {% endfor %}
+    <div class="col-span-2 mt-3">
+      <button class="bg-brand hover:bg-brand-dark text-slate-950 font-bold px-5 py-2 rounded-xl">Save events</button>
+    </div>
+  </form>
+</div>
+</div>
+{% endblock %}

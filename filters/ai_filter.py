@@ -1,4 +1,4 @@
-import logging, time
+import logging, os, time
 from datetime import datetime, timezone
 from dataclasses import dataclass
 from typing import Optional
@@ -78,8 +78,13 @@ def score_signal(symbol,direction,entry,sl_price,tp,regime_result=None,atr=None,
     # SELL-side disease (SELL PF 0.54, WR ~19%). A confirmed counter-trend signal
     # now keeps only 65% of its score; aligned/range/unknown are untouched.
     if td.startswith("counter"):
-        final=round(final*0.65)
-        breakdown["counter_trend_penalty"]={"detail":"final ×0.65 (F8) — confirmed counter-trend"}
+        # [F8-DIAL 08-01, OFF BY DEFAULT] evidence-gated tightening 0.65 -> 0.50.
+        # Flip with F8_CT_50=true in .env after weekend review approves.
+        # Evidence to flip: counter-trend trades since F8 (07-02) still PF<0.9
+        # at n>=20 (counter-trend is the #1 documented loss driver, SELL -406).
+        _ct_mult = 0.5 if os.getenv("F8_CT_50", "false").lower() in ("1", "true", "yes") else 0.65
+        final=round(final*_ct_mult)
+        breakdown["counter_trend_penalty"]={"detail":f"final ×{_ct_mult} (F8) — confirmed counter-trend"}
     final=max(0,min(100,final)); passed=final>=threshold; recommended=final>=threshold+15
     flags=[]
     if s1<15: flags.append(f"session({session})")
@@ -91,7 +96,7 @@ def score_signal(symbol,direction,entry,sl_price,tp,regime_result=None,atr=None,
     try:
         from learning.weight_engine import load_weights
         w_age=load_weights().get("updated_at","never")
-    except: w_age="never"
+    except Exception: w_age="never"
     log.info(f"[FILTER] {symbol} {direction}: {final}/{threshold} passed={passed} regime={regime_name}")
     # [F6 2026-07-02] never let the AI override a news-flagged block — trading
     # into a high-impact window on LLM confidence is how "soft filter" becomes

@@ -23,7 +23,7 @@ Telegram on trade open now shows:
   Regime confidence + position scale
 """
 
-import json, time, ssl, socket, hmac, hashlib, ipaddress
+import json, time, hmac, hashlib, ipaddress
 import threading, logging, logging.handlers, os, signal
 import tempfile, shutil, requests
 from collections import defaultdict
@@ -35,7 +35,6 @@ from dotenv import load_dotenv
 from core.sl_engine          import calculate_institutional_sl, validate_rr, SLResult
 from core import signal_memory as mem
 from core.ic_markets         import ICMarketsClient
-import requests
 from filters.ai_filter        import score_signal, FilterResult
 
 # ── Phase 2 (log-only): Market Flow Vector from Pine payload fields ──
@@ -196,7 +195,7 @@ _rate_lock = threading.Lock()
 def _ip_ok(ip):
     if not _ALL_NETS: return True
     try: a = ipaddress.IPv4Address(ip); return any(a in n for n in _ALL_NETS)
-    except: return False
+    except Exception: return False
 
 def _rate_ok(ip):
     now = time.time()
@@ -215,9 +214,9 @@ def _atomic_write(path, data):
     try:
         with os.fdopen(fd, "w") as f: json.dump(data, f, indent=2); f.flush(); os.fsync(f.fileno())
         shutil.move(tmp, path)
-    except:
+    except Exception:
         try: os.unlink(tmp)
-        except: pass
+        except Exception: pass
         raise
 
 
@@ -290,7 +289,7 @@ def _is_dup(sid):
     seen = state.get("seen_signal_ids", {})
     if sid not in seen: return False
     try: return (datetime.now(timezone.utc) - datetime.fromisoformat(seen[sid])).total_seconds() < SIGNAL_DEDUP_MIN * 60
-    except: return False
+    except Exception: return False
 
 def _mark_seen(sid):
     seen = state.setdefault("seen_signal_ids", {})
@@ -298,101 +297,17 @@ def _mark_seen(sid):
     cut = datetime.now(timezone.utc) - timedelta(minutes=SIGNAL_DEDUP_MIN)
     state["seen_signal_ids"] = {k: v for k, v in seen.items() if datetime.fromisoformat(v) > cut}
 
-# ━━ XTB Client ─────────────────────━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-class XTBClient:
-    def __init__(self):
-        self.host=XTB_HOST; self.port=XTB_PORT; self.sock=None
-        self.stream_session_id=None; self._lock=threading.Lock()
-        self._connected=False; self._login_ok=False; self._recv_buf=b""
-
-    def _open_socket(self):
-        raw=socket.socket(socket.AF_INET,socket.SOCK_STREAM); raw.settimeout(20)
-        ctx=ssl.create_default_context(); s=ctx.wrap_socket(raw,server_hostname=self.host)
-        s.connect((self.host,self.port)); return s
-
-    def connect(self):
-        self.sock=self._open_socket(); self._recv_buf=b""; self._connected=True
-        log.info(f"[XTB] {'DEMO' if USE_DEMO else 'REAL'} :{self.port}")
-
-    def disconnect(self):
-        try:
-            if self.sock: self.sock.close()
-        except: pass
-        self.sock=None; self._recv_buf=b""; self._connected=False; self._login_ok=False
-
-    def _login_raw(self):
-        r=self._send_raw({"command":"login","arguments":{"userId":XTB_USER,"password":XTB_PASS}})
-        if r is None:
-            log.error("[XTB] Login: no response"); return False
-        if r.get("status"):
-            self.stream_session_id=r.get("streamSessionId"); self._login_ok=True
-            log.info("[XTB] Login OK"); return True
-        log.info("[XTB] 2FA required, generating code...")
-        try:
-            import pyotp
-            totp_secret=os.getenv("XTB_TOTP_SECRET","").strip()
-            if not totp_secret:
-                log.error("[XTB] XTB_TOTP_SECRET not set in .env"); return False
-            code=pyotp.TOTP(totp_secret).now()
-            log.info("[XTB] Sending 2FA code: "+code)
-            r2=self._send_raw({"command":"twoFactorAuth","arguments":{"code":code}})
-            if r2 and r2.get("status"):
-                self.stream_session_id=r2.get("streamSessionId"); self._login_ok=True
-                log.info("[XTB] 2FA login OK"); return True
-            log.error("[XTB] 2FA failed: "+str(r2)); return False
-        except Exception as e:
-            log.error("[XTB] 2FA error: "+str(e)); return False
-
-    def login(self): return self._login_raw()
-
-    def ensure_connected(self, retries=6):
-        if self._connected and self._login_ok: return
-        for i in range(1, retries+1):
-            wait = min(2**i, 60)
-            try: self.disconnect(); self.connect()
-            except Exception as e: log.error(f"[XTB] Connect {i}: {e}"); time.sleep(wait); continue
-            if self._login_raw(): send_telegram("🔄 <b>XTB reconnected</b>"); return
-            time.sleep(wait)
-        raise ConnectionError("[XTB] Exhausted reconnects")
-
-    def _send_raw(self, cmd):
-        self.sock.sendall((json.dumps(cmd)+"\n").encode())
-        while True:
-            if b"\n" in self._recv_buf:
-                line,self._recv_buf=self._recv_buf.split(b"\n",1); line=line.strip()
-                if not line: continue
-                try: return json.loads(line.decode("utf-8"))
-                except json.JSONDecodeError: continue
-            chunk=self.sock.recv(16384)
-            if not chunk: break
-            self._recv_buf+=chunk
-
-    def _send(self, cmd):
-        with self._lock:
-            try: return self._send_raw(cmd)
-            except (ConnectionError,OSError,ssl.SSLError) as e:
-                log.warning(f"[XTB] {e}"); self._connected=False; self._login_ok=False
-                self.ensure_connected(); return self._send_raw(cmd)
-
-    def ping(self):               self._send({"command":"ping"})
-    def get_balance(self):        return float(self._send({"command":"getMarginLevel"}).get("returnData",{}).get("balance",1000.0))
-    def get_open_trades(self):    return self._send({"command":"getTrades","arguments":{"openedOnly":True}}).get("returnData") or []
-    def get_closed_trades(self,hrs=48):
-        s=int((time.time()-hrs*3600)*1000)
-        return self._send({"command":"getTradesHistory","arguments":{"start":s,"end":0}}).get("returnData") or []
-    def fetch_symbol_spec(self,sym): return self._send({"command":"getSymbol","arguments":{"symbol":sym}}).get("returnData") or {}
-    def open_trade(self,sym,dir_,vol,sl,tp,comment="BS"):
-        return self._send({"command":"tradeTransaction","arguments":{"tradeTransInfo":{"cmd":0 if dir_=="BUY" else 1,"symbol":sym,"volume":vol,"sl":sl,"tp":tp,"type":0,"price":0,"comment":comment,"expiration":0}}})
-    def close_trade(self,oid,sym,vol,dir_):
-        return self._send({"command":"tradeTransaction","arguments":{"tradeTransInfo":{"cmd":1 if dir_=="BUY" else 0,"symbol":sym,"volume":vol,"type":2,"order":oid,"price":0,"expiration":0}}})
-
+# ━━ Executor client ───────────────────━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# [HYGIENE 08-01] dead XTBClient class removed (never instantiated since the
+# ICMarketsClient migration). XTB_USER/XTB_PASS stay required so the live
+# .env contract is unchanged.
 xtb = ICMarketsClient()  # IC Markets cTrader
 
 # ━━ Spec cache ──────────────────────━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 _spec_cache={}; _spec_time={}; _spec_lock=threading.Lock()
 def _spec_valid(s):
     try: return float(s.get("tickSize",0))>0 and float(s.get("tickValue",0))>0
-    except: return False
+    except Exception: return False
 def get_spec(sym, force=False):
     now=time.time()
     with _spec_lock:
@@ -449,7 +364,7 @@ def is_news_blocking():
                 return True,f"News in {mins}min: {ev.get('title')} [{_cur}]",mins
             if diff<=2700 and _cur in ("USD","EUR","JPY","GBP","CAD","AUD","XAU","XAG","BTC"):
                 return True,f"News in {mins}min: {ev.get('title')} [{_cur}]",mins
-        except: continue
+        except Exception: continue
     return False,"clear",closest if closest<9999 else None
 
 # ━━ Background threads ──────────────━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -463,7 +378,7 @@ def _keepalive():
         except Exception as e:
             log.warning(f"[KA] {e}")
             try: xtb.ensure_connected()
-            except: pass
+            except Exception: pass
 
 _mon_cycle=0
 _MON_HEARTBEAT_EVERY=5  # ~5min at 60s/cycle
@@ -612,7 +527,8 @@ def _monitor():
                     # ── [MAE-LIVE]: use excursion accumulated by the monitor loop ──
                     _mae=tracked.get("mae"); _mfe=tracked.get("mfe")
                     log.info(f"[MAE-LIVE] {tracked.get('symbol')} {tracked.get('order_id')} mae={_mae} mfe={_mfe}")
-                    mem_close(tracked.get("signal_id","?"), float(cp), profit, swap, comm, hold_time_seconds=_hold, mae=_mae, mfe=_mfe)
+                    mem_close(tracked.get("signal_id","?"), float(cp), profit, swap, comm, hold_time_seconds=_hold, mae=_mae, mfe=_mfe,
+                              be_done=bool(tracked.get("be_done")), partial_done=bool(tracked.get("partial_done")))
                     equity_guard.record_trade(net, tracked["symbol"])
                     state["equity"]=equity_guard.to_dict(); save_state()
                     bal=xtb.get_balance(); equity_guard.update_balance(bal)
@@ -647,7 +563,7 @@ def _calibration_worker():
     while not _shutdown.is_set():
         try:
             bal=xtb.get_balance()
-        except: bal=1000.0
+        except Exception: bal=1000.0
         guard=equity_guard.check(bal,state.get("consecutive_losses",0))
         daily_dd=max(0, -equity_guard.eq.day_pnl) / max(equity_guard.eq.day_open_balance,1)
         result=recalibrate(daily_dd_pct=daily_dd)
@@ -681,7 +597,11 @@ def handle_signal(payload: dict, raw_body: bytes = b"") -> dict:
         exp=hmac.new(TV_HMAC_SECRET.encode(),raw_body,hashlib.sha256).hexdigest()
         if not hmac.compare_digest(exp,tok): return {"status":"error","msg":"invalid HMAC"}
 
-    log.info(f"[WEBHOOK RAW] {payload}")
+    # [HYGIENE 08-01] redact the secret before logging — the raw payload was
+    # logged AFTER secret injection, so the webhook secret landed in bot.log
+    # and journalctl (Iron Rule 8). One committed journalctl dump leaked it;
+    # ROTATE WEBHOOK_SECRET after deploying this.
+    log.info(f"[WEBHOOK RAW] { {k: ('***' if k == 'secret' else v) for k, v in payload.items()} }")
 
     # ── Patch C: filter v17 ULTIMATE chart-annotation alerts ─────────────
     # v17 sends INFO/WARN (BOS, sweeps, inducements) and SCALP/MICRO templates
@@ -708,7 +628,9 @@ def handle_signal(payload: dict, raw_body: bytes = b"") -> dict:
         if not _v4rr:
             log.info(f"[v17v18-FILTER] dropped — v4_rr=False from {_sys}")
             return {"status":"ignored","msg":f"{_sys} v4_rr veto failed"}
-        log.info(f"[v17v18-ACCEPT] {_sys} grade={_grade} symbol={payload.get(chr(39)+chr(115)+chr(121)+chr(109)+chr(98)+chr(111)+chr(108)+chr(39),chr(39)+chr(39))}")
+        # [HYGIENE 08-01] was an obfuscated chr(39)... key ('symbol' WITH quote
+        # chars) from a patch-script quoting accident — always logged symbol=''
+        log.info(f"[v17v18-ACCEPT] {_sys} grade={_grade} symbol={payload.get('symbol','')}")
         try:
             _tg_sym = payload.get("symbol","").split(":")[-1]
             _tg_dir = (payload.get("direction") or payload.get("signal","")).upper()
@@ -843,6 +765,12 @@ def handle_signal(payload: dict, raw_body: bytes = b"") -> dict:
     except (KeyError,TypeError,ValueError) as e: return {"status":"error","msg":f"field: {e}"}
 
     if symbol not in ALLOWED_SYMBOLS: return {"status":"error","msg":f"unsupported: {sym_raw}"}
+    # ── [ASSET-GATE 08-01] flagged, OFF by default — see utils/asset_gate.py ──
+    from utils.asset_gate import asset_gate_check
+    _ag_block, _ag_mult = asset_gate_check(symbol)
+    if _ag_block:
+        log.info(f"[ASSET-GATE] {symbol} {direction} dropped — symbol benched in .env")
+        return {"status":"skipped","msg":f"{symbol} disabled by asset gate"}
     if direction not in ("BUY","SELL"): return {"status":"error","msg":"BUY or SELL only"}
     if entry<=0 or raw_sl<=0 or tp<=0: return {"status":"error","msg":"invalid prices"}
 
@@ -872,7 +800,7 @@ def handle_signal(payload: dict, raw_body: bytes = b"") -> dict:
 
     # ── PRIORITY 1: Equity Guard ──────────────────────────────────────────────
     try: balance=xtb.get_balance()
-    except: balance=1000.0
+    except Exception: balance=1000.0
     guard=equity_guard.check(balance,state.get("consecutive_losses",0))
     if not guard.allowed:
         send_telegram(f"⛔ <b>Equity Guard</b>\n{guard.block_reason}\nTier: {guard.tier_hit}")
@@ -1024,6 +952,10 @@ def handle_signal(payload: dict, raw_body: bytes = b"") -> dict:
     _cluster_scale = 0.25 if _cn < 10 else 0.50 if _cn < 30 else 1.00
     effective_risk=guard.risk_pct * regime.risk_scale * disc_result.position_scale * _cluster_scale
     effective_risk=max(0.003, min(effective_risk, 0.01))
+    # [ASSET-GATE 08-01] size multiplier applied AFTER the 0.3% floor so a
+    # 0.5x gold dial actually halves risk (the floor otherwise re-inflates it).
+    # _ag_mult is 1.0 whenever ASSET_GATE_ENABLED=false (default) — inert.
+    effective_risk *= _ag_mult
     log.info(f"[CLUSTER-RISK] {symbol} cluster_n={_cn} scale={_cluster_scale} -> risk={effective_risk*100:.3f}%")
     lot,_=calc_lot(symbol,entry,inst_sl,balance,effective_risk)
 
@@ -1089,6 +1021,40 @@ def handle_signal(payload: dict, raw_body: bytes = b"") -> dict:
                 signal_age_bars=int(signal_age_seconds_v//900) if signal_age_seconds_v is not None else None,  # 15m bars
                 regime=regime.regime if regime else None,
             ))
+
+            # ── [TELEMETRY 08-01] LOG-ONLY execution/feature capture. Fully
+            # guarded — a failure here can NEVER affect the trade (mirrors the
+            # flow_vector pattern). Bridge fill fields (fill_price/slippage/
+            # latency/requotes) stay null until the v7 bridge captures them. ──
+            try:
+                from learning.telemetry import capture_open as _cap
+                _rd = resp.get("returnData", {}) or {}
+                _cap(
+                    signal_id=sid, broker_ticket=order_id,
+                    pine_version=payload.get("pine_ver") or payload.get("version"),
+                    weight_version=load_weights().get("updated_at"),
+                    cluster_version=cluster.cluster_key,
+                    symbol=symbol, side=direction, session=filt.session,
+                    hour=now_utc.hour, day_of_week=now_utc.weekday(),
+                    regime=regime.regime if regime else None,
+                    atr=atr, adx=adx, rsi=payload.get("rsi"),
+                    dxy=payload.get("dxy_dir"), oil=payload.get("oil_spike"),
+                    us10y=payload.get("yield_dir"),
+                    zone=payload.get("zone") or payload.get("loc_zone"),
+                    setup_type=payload.get("type"), htf_align=htf_trend,
+                    strategy_id=__import__("learning.strategy_dna", fromlist=["classify"]).classify(payload),
+                    grade=payload.get("grade"), ai_score=filt.score, pine_score=pine_score,
+                    signal_time=(signal_age_seconds_v and (now_utc.timestamp()-signal_age_seconds_v)),
+                    v7_receive_time=now_utc.timestamp(),
+                    requested_price=_rd.get("requested_price", entry),
+                    fill_price=_rd.get("fill_price") or _rd.get("price"),
+                    slippage=_rd.get("slippage"),
+                    bid=_rd.get("bid"), ask=_rd.get("ask"), spread=_rd.get("spread"),
+                    fill_delay=_rd.get("fill_delay_ms"), broker_latency=_rd.get("latency_ms"),
+                    requotes=_rd.get("requotes"), retry_count=_rd.get("retry_count"),
+                )
+            except Exception as _te:
+                log.warning(f"[TELEMETRY] capture skipped (non-fatal): {_te}")
 
             sl_diff=round(abs(inst_sl-raw_sl),2)
             arrow="🟢" if direction=="BUY" else "🔴"
@@ -1186,14 +1152,25 @@ _start=datetime.now(timezone.utc).isoformat()
 def webhook():
     raw=request.get_data()
     try: payload=json.loads(raw) if raw else {}
-    except: return jsonify({"status":"error","msg":"invalid JSON"}),400
-    return jsonify(handle_signal(payload,raw))
+    except Exception: return jsonify({"status":"error","msg":"invalid JSON"}),400
+    result=handle_signal(payload,raw)
+    # ── [REJECT-TELEMETRY 08-01] Stage 3: log every non-traded signal with its
+    # reason + conditions, at this single choke point. Fully guarded — cannot
+    # affect the response. 'ok'/'ignored' (accepted or not-a-trade) are skipped.
+    try:
+        _st=str((result or {}).get("status",""))
+        if _st in ("rejected","blocked","filtered","skipped","paused"):
+            from learning.telemetry import capture_reject
+            capture_reject(payload, _st, str((result or {}).get("msg","")))
+    except Exception as _re:
+        log.warning(f"[REJECT-TELEMETRY] skipped (non-fatal): {_re}")
+    return jsonify(result)
 
 @app.route("/health",methods=["GET"])
 def health():
     ok=xtb._connected and xtb._login_ok
     try: bal=xtb.get_balance()
-    except: bal=0
+    except Exception: bal=0
     guard=equity_guard.check(bal,state.get("consecutive_losses",0))
     w=load_weights()
     return jsonify({
@@ -1223,7 +1200,7 @@ def stats_route():
 def recal_route():
     if (request.get_json(force=True) or {}).get("secret")!=WEBHOOK_SECRET: abort(403)
     try: bal=xtb.get_balance()
-    except: bal=1000.0
+    except Exception: bal=1000.0
     daily_dd=max(0,-equity_guard.eq.day_pnl)/max(equity_guard.eq.day_open_balance,1)
     result=recalibrate(daily_dd_pct=daily_dd)
     send_telegram(format_calibration_telegram(result))
@@ -1233,7 +1210,7 @@ def recal_route():
 def status_route():
     if request.args.get("secret")!=WEBHOOK_SECRET: abort(403)
     try: bal=xtb.get_balance()
-    except: bal=0
+    except Exception: bal=0
     return jsonify({"state":state,"equity":equity_guard.status_summary(bal),"timestamp":datetime.now().isoformat()})
 
 @app.route("/reset",methods=["POST"])
@@ -1299,7 +1276,7 @@ def startup():
         threading.Thread(target=fn,daemon=True,name=name).start()
 
     try: bal=xtb.get_balance()
-    except: bal=1000.0
+    except Exception: bal=1000.0
     equity_guard.update_balance(bal)
     w=load_weights(); mem=stats_summary(50)
 
@@ -1345,7 +1322,9 @@ def startup():
                         except Exception: pass
                         _mclose(_orphan.get("signal_id","?"), float(_deal.get("close_price",0)),
                                 float(_deal.get("profit",0)), float(_deal.get("swap",0)),
-                                float(_deal.get("commission",0)), hold_time_seconds=_hold)
+                                float(_deal.get("commission",0)), hold_time_seconds=_hold,
+                                mae=_orphan.get("mae"), mfe=_orphan.get("mfe"),
+                                be_done=bool(_orphan.get("be_done")), partial_done=bool(_orphan.get("partial_done")))
                     except Exception as _me:
                         log.warning(f"[STARTUP] mem_close failed: {_me}")
                     if _net > 0:

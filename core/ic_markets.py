@@ -152,7 +152,15 @@ class ICMarketsClient:
             data = r.json()
             log.info(f"[CT] MT5 response: {data}")
             if data.get("status") == "ok":
-                return {"status": True, "returnData": {"order": data.get("order_id", 0), "volume": data.get("volume", vol)}}
+                _rd = {"order": data.get("order_id", 0), "volume": data.get("volume", vol)}
+                # [TELEMETRY 08-01] pass the bridge's execution facts through to
+                # the telemetry logger (was dropped here before). Log-only.
+                for _k in ("price", "requested_price", "fill_price", "slippage",
+                           "bid", "ask", "spread", "latency_ms", "fill_delay_ms",
+                           "retcode", "retry_count", "requotes"):
+                    if _k in data:
+                        _rd[_k] = data[_k]
+                return {"status": True, "returnData": _rd}
             return {"status": False, "errorDescr": data.get("msg","MT5 error")}
         except Exception as e:
             log.error(f"[CT] Executor error: {e}")

@@ -108,8 +108,11 @@ def user_action(
     target = db.get(User, uid)
     if target is None:
         raise HTTPException(404)
-    if target.role == "superadmin" and user.role != "superadmin":
-        raise HTTPException(403, "Cannot modify a super-admin")
+    # [SEC 08-01] H4: only a super-admin may act on ANY admin-level account
+    # (was: only super-admin targets were protected, so one admin could
+    # reset_password/ban a peer admin and seize the account).
+    if target.is_admin and user.role != "superadmin":
+        raise HTTPException(403, "Only a super-admin can modify an admin account")
 
     msg = "Done"
     if action == "suspend":
@@ -242,6 +245,13 @@ def withdrawal_decision(tx_id: int, decision: str, request: Request, db: Session
         raise HTTPException(404)
     if decision not in ("approve", "reject"):
         raise HTTPException(400)
+    # [SEC 08-01] re-verify funds at approval time. Balance is checked when the
+    # request is filed, but two pending withdrawals each <= balance could both be
+    # approved into a negative balance. Re-check the current completed balance.
+    if decision == "approve":
+        from app.services.billing import wallet_balance
+        if wallet_balance(db, tx.user_id) < abs(tx.amount):
+            raise HTTPException(400, "Insufficient current balance to approve this withdrawal")
     tx.status = "completed" if decision == "approve" else "rejected"
     audit(db, "admin_finance", f"withdrawal #{tx_id} {decision}", user_id=tx.user_id,
           actor=f"admin:{user.id}", request=request, commit=False)

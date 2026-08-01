@@ -48,9 +48,35 @@ class Settings(BaseSettings):
     otp_ttl_minutes: int = 10
     otp_max_attempts: int = 5
 
+    # [SEC 08-01] wallet deposits auto-complete ONLY when this is explicitly on
+    # (a local sandbox switch), never merely because env != production. Default
+    # off closes the "any user self-credits their wallet in dev/staging" hole.
+    wallet_autocredit_dev: bool = False
+
+    # Defaults that must never survive into production.
+    _INSECURE_DEFAULTS = {
+        "secret_key": "dev-only-secret-change-me",
+        "brain_webhook_secret": "dev-brain-secret",
+    }
+
     @property
     def is_production(self) -> bool:
         return self.env == "production"
+
+    def assert_secure_for_production(self) -> None:
+        """[SEC 08-01] refuse to boot in production on shipped default secrets.
+        Forging JWT sessions (admin takeover) and spoofing the brain webhook
+        both hinge on these; a silent default is a full-compromise path."""
+        if not self.is_production:
+            return
+        bad = [name for name, default in self._INSECURE_DEFAULTS.items()
+               if getattr(self, name) == default]
+        if bad:
+            raise RuntimeError(
+                "Refusing to start in production with default secret(s): "
+                + ", ".join(f"BB_{n.upper()}" for n in bad)
+                + " — set strong values (openssl rand -hex 32)."
+            )
 
     @property
     def all_secret_keys(self) -> list[str]:

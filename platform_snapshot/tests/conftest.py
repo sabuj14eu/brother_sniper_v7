@@ -7,6 +7,9 @@ os.environ["BB_DATABASE_URL"] = "sqlite:///./test_brotherbot.db"
 os.environ["BB_SECRET_KEY"] = "test-secret-key-for-pytest-only-0123456789"
 os.environ["BB_BRAIN_WEBHOOK_SECRET"] = "test-brain-secret"
 os.environ["BB_SWEEPER_ENABLED"] = "false"
+# tests exercise the wallet money-path; enable the dev-sandbox auto-credit flag
+# (production never sets this — deposits stay pending there). See SEC 08-01 C2.
+os.environ["BB_WALLET_AUTOCREDIT_DEV"] = "true"
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 

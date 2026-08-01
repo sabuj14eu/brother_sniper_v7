@@ -60,7 +60,12 @@ def _start_session(db: Session, request: Request, user: User) -> RedirectRespons
     audit(db, "login", "session started", user_id=user.id, request=request, commit=False)
     db.commit()
     dest = "/admin" if user.is_admin else "/dashboard"
-    resp = RedirectResponse(request.query_params.get("next") or dest, status_code=302)
+    # [SEC 08-01] open-redirect guard: only honor a local path for ?next=
+    # (single leading slash, no scheme, no protocol-relative //host).
+    _nxt = request.query_params.get("next") or ""
+    if not (_nxt.startswith("/") and not _nxt.startswith("//")):
+        _nxt = dest
+    resp = RedirectResponse(_nxt, status_code=302)
     resp.set_cookie(
         SESSION_COOKIE,
         create_session_token(user.id, user.role, sid),

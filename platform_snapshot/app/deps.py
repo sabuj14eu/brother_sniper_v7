@@ -33,8 +33,17 @@ def _resolve_user(request: Request, db: Session) -> User | None:
     sess = db.query(UserSession).filter_by(session_id=payload.get("sid", ""), revoked=False).first()
     if sess is None:
         return None
+    # [SEC 08-01] bind the token's subject to the session's owner. Without this,
+    # a forged token (see the default-secret guard) with sub=<any user id> plus
+    # any live sid impersonates that user; and a leaked sid can't be paired with
+    # a different sub. Session's user_id is authoritative.
+    try:
+        if int(sess.user_id) != int(payload["sub"]):
+            return None
+    except (KeyError, TypeError, ValueError):
+        return None
     sess.last_seen_at = utcnow()
-    user = db.get(User, int(payload["sub"]))
+    user = db.get(User, int(sess.user_id))
     if user is None or user.is_banned or user.is_suspended:
         return None
     return user

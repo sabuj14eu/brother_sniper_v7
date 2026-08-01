@@ -102,7 +102,12 @@ def wallet_deposit(request: Request, amount: float = Form(...), provider: str = 
         checkout_url = create_checkout(provider, amount, user.id)
     except ValueError as exc:
         return RedirectResponse(f"/wallet?error={exc}", status_code=302)
-    status = "pending" if get_settings().is_production else "completed"
+    # [SEC 08-01] C2: deposits are PENDING unless the explicit dev-sandbox flag is
+    # set. Previously any non-production env auto-completed a client-supplied
+    # amount -> a user could self-credit unlimited spendable balance. Real money
+    # in production must be completed by an admin/payment-webhook, never here.
+    _s = get_settings()
+    status = "completed" if (_s.wallet_autocredit_dev and not _s.is_production) else "pending"
     db.add(WalletTransaction(user_id=user.id, kind="deposit", amount=round(amount, 2), status=status,
                              reference=f"{provider} deposit"))
     audit(db, "wallet", f"deposit {amount} via {provider}", user_id=user.id, request=request, commit=False)

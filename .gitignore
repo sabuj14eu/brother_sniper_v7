@@ -14,3 +14,8 @@ __pycache__/
 .venv*/
 venv/
 data/
+
+# never commit DB dumps
+platform_snapshot/backups/
+*.dump
+*.sql

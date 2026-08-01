@@ -47,14 +47,22 @@ sys.path.insert(0, HERE)
 
 # ── data ─────────────────────────────────────────────────────────────────────
 
-def load_trades():
-    """Merged closed trades from the v7 journal (open+close joined by signal_id)."""
-    try:
-        from learning.trade_memory import load_all
-        rows = load_all()
-    except Exception:
-        # standalone fallback: merge the jsonl ourselves
-        rows = _merge_jsonl(os.path.join(HERE, "learning", "trades.jsonl"))
+def load_trades(unified=False):
+    """Merged closed trades. unified=True joins telemetry (strategy_id, spread,
+    slippage, latency, structure fields) onto each trade via load_unified, so the
+    per-strategy and execution-quality dimensions become available."""
+    if unified:
+        try:
+            from learning.telemetry import load_unified
+            rows = load_unified()
+        except Exception:
+            unified = False
+    if not unified:
+        try:
+            from learning.trade_memory import load_all
+            rows = load_all()
+        except Exception:
+            rows = _merge_jsonl(os.path.join(HERE, "learning", "trades.jsonl"))
     return [t for t in rows
             if t.get("net_profit") is not None
             and "test" not in str(t.get("signal_id", "")).lower()]
@@ -158,9 +166,10 @@ def _hour(t):
 # dimension name -> extractor. Setup-type/zone auto-included when captured.
 DIMENSIONS = {
     "symbol":   lambda t: t.get("symbol"),
-    "side":     lambda t: t.get("direction"),
+    "side":     lambda t: t.get("direction") or t.get("side"),
     "session":  lambda t: t.get("session"),
     "regime":   lambda t: t.get("regime"),
+    "strategy": lambda t: t.get("strategy_id"),                   # Stage 8 DNA (S1..S5)
     "setup":    lambda t: t.get("setup_type") or t.get("type"),   # feature-store field
     "zone":     lambda t: t.get("zone") or t.get("loc_zone"),     # feature-store field
     "score":    lambda t: _band(t.get("ai_score"), [(0, 40, "<40"), (40, 55, "40-54"),
@@ -208,7 +217,7 @@ def summarize(trades, extractor, global_wr):
 
 # ── two-way combinations ─────────────────────────────────────────────────────
 
-COMBO_DIMS = ["symbol", "side", "session", "regime", "setup", "zone"]
+COMBO_DIMS = ["symbol", "side", "session", "regime", "strategy", "setup", "zone"]
 
 
 def combinations(trades, global_wr, min_n=8):
@@ -275,9 +284,11 @@ def _fmt_rows(rows):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--json", help="write machine-readable report to this path")
+    ap.add_argument("--unified", action="store_true",
+                    help="join telemetry (strategy_id, spread, slippage) onto trades")
     args = ap.parse_args()
 
-    trades = load_trades()
+    trades = load_trades(unified=args.unified)
     rep = build(trades)
 
     if args.json:

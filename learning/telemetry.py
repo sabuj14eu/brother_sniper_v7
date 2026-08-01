@@ -38,7 +38,7 @@ _SCHEMA_GROUPS = {
                "regime", "bid", "ask", "spread", "atr", "adx", "rsi",
                "dxy", "oil", "us10y", "vix", "volatility"],
     "structure": ["bos", "choch", "fvg", "liquidity_sweep", "order_block",
-                  "zone", "htf_align", "setup_type"],
+                  "zone", "htf_align", "setup_type", "strategy_id"],
     "ai": ["grade", "ai_score", "pine_score", "council_votes", "confidence",
            "reject_reason"],
     "timing": ["signal_time", "v7_receive_time", "send_time",
@@ -92,6 +92,32 @@ def capture_open(**values) -> None:
         write_row(build_open_row(**values))
     except Exception as e:  # pragma: no cover - defensive
         log.warning(f"[TELEMETRY] capture_open skipped (non-fatal): {e}")
+
+
+def capture_reject(payload: dict, status: str, reason: str) -> None:
+    """Stage 3 — log a REJECTED signal with its reason + the conditions it fired
+    under, so the nightly report can later ask 'which rejection rules actually
+    improve expectancy?' (join a rejected signal's later forward outcome, if any,
+    by signal_id). Never raises. Reads only the Pine payload — no live effect."""
+    try:
+        from learning.strategy_dna import classify
+        row = build_open_row(
+            signal_id=payload.get("signal_id"),
+            symbol=payload.get("symbol"), side=payload.get("direction") or payload.get("signal"),
+            regime=payload.get("regime"),
+            atr=payload.get("atr"), adx=payload.get("adx"), rsi=payload.get("rsi"),
+            dxy=payload.get("dxy_dir"), us10y=payload.get("yield_dir"),
+            zone=payload.get("zone") or payload.get("loc_zone"),
+            setup_type=payload.get("type"),
+            grade=payload.get("grade"), pine_score=payload.get("score"),
+            reject_reason=reason,
+        )
+        row["strategy_id"] = classify(payload)
+        row["_type"] = "reject"
+        row["reject_status"] = status
+        write_row(row)
+    except Exception as e:  # pragma: no cover - defensive
+        log.warning(f"[TELEMETRY] capture_reject skipped (non-fatal): {e}")
 
 
 # ── unified feature store: join telemetry (open) + trades (outcome) ──────────

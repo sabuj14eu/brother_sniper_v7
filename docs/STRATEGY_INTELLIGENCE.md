@@ -204,3 +204,28 @@ curl http://127.0.0.1:5001/health
 **Verify telemetry flows:** after the next fill, `tail -1 learning/telemetry.jsonl`
 should show non-null `spread`, `fill_price`, `slippage`, `latency_ms`. Then
 `nightly_edge.py` gains an execution-quality view automatically.
+
+---
+
+## Stages 3 & 8 COMPLETE (2026-08-01) — rejection capture + strategy DNA
+
+**Stage 8 — Strategy DNA** (`learning/strategy_dna.py`): every signal is classified
+into one family from fields Pine already sends (no new capture): S1 trend-continuation,
+S2 pullback-sniper, S3 breakout, S4 mean-reversion, S5 news-reaction, S0 unclassified.
+Tagged live onto every trade's telemetry (`strategy_id`) and backfillable over
+`signal_memory.json`. `nightly_edge --unified` now reports per-strategy WR / EV_lcb /
+advisory weight — so a losing family (e.g. breakout PF 0.81) surfaces and can be
+retired on evidence, not feeling.
+
+**Stage 3 — Rejection analytics** (`telemetry.capture_reject` + one hook at the
+`/webhook` choke point): every non-traded signal (rejected/blocked/filtered/skipped/
+paused) is logged with its reason + the conditions it fired under + its strategy_id.
+Fully guarded — cannot affect the response. Later, join a rejected signal's forward
+outcome by signal_id to answer "which rejection rules actually improve expectancy" —
+e.g. proving the council rejects too many early reversals.
+
+**Capture is now complete.** Everything remaining (nightly report polish, dashboard
+heatmaps, the ±10% live weight governor) is analysis on data the system finally
+records — none of it is time-sensitive. Per Iron Rule 5: let it accumulate, judge
+after ~100 new-Pine trades. Next review: run `python3 nightly_edge.py --unified` and
+`python3 scorecard.py`.

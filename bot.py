@@ -1042,6 +1042,7 @@ def handle_signal(payload: dict, raw_body: bytes = b"") -> dict:
                     us10y=payload.get("yield_dir"),
                     zone=payload.get("zone") or payload.get("loc_zone"),
                     setup_type=payload.get("type"), htf_align=htf_trend,
+                    strategy_id=__import__("learning.strategy_dna", fromlist=["classify"]).classify(payload),
                     grade=payload.get("grade"), ai_score=filt.score, pine_score=pine_score,
                     signal_time=(signal_age_seconds_v and (now_utc.timestamp()-signal_age_seconds_v)),
                     v7_receive_time=now_utc.timestamp(),
@@ -1152,7 +1153,18 @@ def webhook():
     raw=request.get_data()
     try: payload=json.loads(raw) if raw else {}
     except Exception: return jsonify({"status":"error","msg":"invalid JSON"}),400
-    return jsonify(handle_signal(payload,raw))
+    result=handle_signal(payload,raw)
+    # ── [REJECT-TELEMETRY 08-01] Stage 3: log every non-traded signal with its
+    # reason + conditions, at this single choke point. Fully guarded — cannot
+    # affect the response. 'ok'/'ignored' (accepted or not-a-trade) are skipped.
+    try:
+        _st=str((result or {}).get("status",""))
+        if _st in ("rejected","blocked","filtered","skipped","paused"):
+            from learning.telemetry import capture_reject
+            capture_reject(payload, _st, str((result or {}).get("msg","")))
+    except Exception as _re:
+        log.warning(f"[REJECT-TELEMETRY] skipped (non-fatal): {_re}")
+    return jsonify(result)
 
 @app.route("/health",methods=["GET"])
 def health():

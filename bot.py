@@ -527,7 +527,8 @@ def _monitor():
                     # ── [MAE-LIVE]: use excursion accumulated by the monitor loop ──
                     _mae=tracked.get("mae"); _mfe=tracked.get("mfe")
                     log.info(f"[MAE-LIVE] {tracked.get('symbol')} {tracked.get('order_id')} mae={_mae} mfe={_mfe}")
-                    mem_close(tracked.get("signal_id","?"), float(cp), profit, swap, comm, hold_time_seconds=_hold, mae=_mae, mfe=_mfe)
+                    mem_close(tracked.get("signal_id","?"), float(cp), profit, swap, comm, hold_time_seconds=_hold, mae=_mae, mfe=_mfe,
+                              be_done=bool(tracked.get("be_done")), partial_done=bool(tracked.get("partial_done")))
                     equity_guard.record_trade(net, tracked["symbol"])
                     state["equity"]=equity_guard.to_dict(); save_state()
                     bal=xtb.get_balance(); equity_guard.update_balance(bal)
@@ -1276,7 +1277,9 @@ def startup():
                         except Exception: pass
                         _mclose(_orphan.get("signal_id","?"), float(_deal.get("close_price",0)),
                                 float(_deal.get("profit",0)), float(_deal.get("swap",0)),
-                                float(_deal.get("commission",0)), hold_time_seconds=_hold)
+                                float(_deal.get("commission",0)), hold_time_seconds=_hold,
+                                mae=_orphan.get("mae"), mfe=_orphan.get("mfe"),
+                                be_done=bool(_orphan.get("be_done")), partial_done=bool(_orphan.get("partial_done")))
                     except Exception as _me:
                         log.warning(f"[STARTUP] mem_close failed: {_me}")
                     if _net > 0:

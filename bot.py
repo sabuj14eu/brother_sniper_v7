@@ -1022,6 +1022,37 @@ def handle_signal(payload: dict, raw_body: bytes = b"") -> dict:
                 regime=regime.regime if regime else None,
             ))
 
+            # ── [TELEMETRY 08-01] LOG-ONLY execution/feature capture. Fully
+            # guarded — a failure here can NEVER affect the trade (mirrors the
+            # flow_vector pattern). Bridge fill fields (fill_price/slippage/
+            # latency/requotes) stay null until the v7 bridge captures them. ──
+            try:
+                from learning.telemetry import capture_open as _cap
+                _rd = resp.get("returnData", {}) or {}
+                _cap(
+                    signal_id=sid, broker_ticket=order_id,
+                    pine_version=payload.get("pine_ver") or payload.get("version"),
+                    weight_version=load_weights().get("updated_at"),
+                    cluster_version=cluster.cluster_key,
+                    symbol=symbol, side=direction, session=filt.session,
+                    hour=now_utc.hour, day_of_week=now_utc.weekday(),
+                    regime=regime.regime if regime else None,
+                    atr=atr, adx=adx, rsi=payload.get("rsi"),
+                    dxy=payload.get("dxy_dir"), oil=payload.get("oil_spike"),
+                    us10y=payload.get("yield_dir"),
+                    zone=payload.get("zone") or payload.get("loc_zone"),
+                    setup_type=payload.get("type"), htf_align=htf_trend,
+                    grade=payload.get("grade"), ai_score=filt.score, pine_score=pine_score,
+                    signal_time=(signal_age_seconds_v and (now_utc.timestamp()-signal_age_seconds_v)),
+                    v7_receive_time=now_utc.timestamp(),
+                    requested_price=entry,
+                    fill_price=_rd.get("price"), slippage=_rd.get("slippage"),
+                    fill_delay=_rd.get("fill_delay_ms"), broker_latency=_rd.get("latency_ms"),
+                    requotes=_rd.get("requotes"), retry_count=_rd.get("retry_count"),
+                )
+            except Exception as _te:
+                log.warning(f"[TELEMETRY] capture skipped (non-fatal): {_te}")
+
             sl_diff=round(abs(inst_sl-raw_sl),2)
             arrow="🟢" if direction=="BUY" else "🔴"
             ev_tag=f"${ev:+.2f}" if cluster.trusted else f"~${ev:.2f} (learning)"

@@ -95,3 +95,64 @@ capture (Stage 1) has enough new-Pine trades behind it.
 - Auto-applied weights. Every live weight change is a reviewed, logged decision.
 - 150 brand-new sensors. Most features already arrive from Pine; capture the
   join first, build only the 🔴 execution telemetry as genuinely new.
+
+---
+
+## Stage 2 build status (2026-08-01) — telemetry capture LANDED (log-only)
+
+`learning/telemetry.py` + one guarded call in `bot.py` (after `mem_open`, mirrors
+the `flow_vector` log pattern — cannot affect the trade). Writes one row per trade
+to `learning/telemetry.jsonl` with the full stable schema; `load_unified()` joins
+it to `trades.jsonl` by signal_id into the single per-trade feature row. 6 tests.
+
+**Captured now (v7-side, this commit):** signal_id, broker_ticket, pine/weight/
+cluster versions, symbol/side/session/hour/day, regime, ATR, ADX, RSI, DXY, oil,
+US10Y, zone, setup_type, htf_align, grade, ai_score, pine_score, signal_time,
+v7_receive_time, requested_price. Outcome (W/L, R, MAE, MFE, BE, exit) joins from
+the journal.
+
+**Still null — the IRRECOVERABLE half — needs the v7 bridge:** `bid`, `ask`,
+`spread`, `fill_price`, `slippage`, `fill_delay`, `broker_latency`, `requotes`,
+`retry_count`, `mt5_send_time`, `fill_time`. bot.py already reads these from the
+bridge response (`resp["returnData"][...]`); they stay null until the bridge
+populates them. **This is the clock that's ticking.**
+
+### What the v7 bridge must add (once it's in git)
+In `sniper_executor.py`, on each order the bridge already sends to MT5, capture and
+return in the JSON response under `returnData`:
+- `price` — the actual **fill price** from the MT5 order result.
+- `slippage` — `fill_price − requested_price` (signed, in points).
+- `latency_ms` — wall time from receiving the v7 request to MT5 acknowledging.
+- `fill_delay_ms` — MT5 send → fill confirmation.
+- `retry_count`, `requotes` — from the order-send retry loop (retcodes 10004/10021).
+- `bid`, `ask` — `symbol_info_tick()` at the moment of send (spread derives from these).
+
+Two lines of capture around the existing `order_send`, plus adding them to the
+response dict. Zero logic change — the order still places exactly as today.
+
+**BLOCKER:** the v7 bridge is not yet in git. Snapshot it first (it's one file):
+```powershell
+copy C:\Users\Administrator\sniper_executor.py C:\temp\sniper_executor.py
+scp C:\temp\sniper_executor.py shyam@brain.signalmesh.dev:/tmp/sniper_executor.py
+```
+then on the box: `cp /tmp/sniper_executor.py /home/shyam/brother_sniper_v7/ && git add -f sniper_executor.py && git commit -m "snapshot v7 bridge" && git push`
+
+## Stage 3 — Rejection analytics (spec)
+Every reject path in `bot.py` already returns a `msg` (low score, HTF conflict,
+spread, news, slot full, margin, kill switch, duplicate, council veto, risk, daily
+loss). Log each rejection as a telemetry row with `_type:"reject"` + `reject_reason`
++ the same market/AI features, so the nightly report can answer **"which rejection
+rules actually improve expectancy"** — by comparing the forward outcome of what was
+rejected vs what was taken. (Needs the same capture hook on the reject returns.)
+
+## Stages 4-7 status
+- **4 Nightly report** — `nightly_edge.py` shipped (Stage 0); grows to the full
+  dimension list automatically as telemetry fields populate.
+- **5 Dashboard** — the platform already has a `/signals` mirror; feed it
+  `edge_report.json` for heatmaps. Platform-side work.
+- **6 Evidence validation** — encoded in `nightly_edge`'s shrinkage + LCB + MIN_N;
+  add the out-of-sample train/validate split + "stable over time" check before any
+  promotion. Human approval stays manual (Iron Rule 5).
+- **7 Live weight governor** — `weight_engine`/`discipline` already clamp [0.30,
+  2.00]; tighten to **±10% per calibration + cooldown + rollback-on-drawdown** when
+  Stage 6 signs off. Not before.

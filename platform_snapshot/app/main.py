@@ -56,6 +56,9 @@ async def lifespan(app: FastAPI):
         task.cancel()
 
 
+# [SEC 08-01] fail fast: never boot production on shipped default secrets.
+get_settings().assert_secure_for_production()
+
 app = FastAPI(
     title="Brother Bot Platform",
     version="1.1.0",

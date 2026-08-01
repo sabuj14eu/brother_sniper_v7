@@ -1045,8 +1045,10 @@ def handle_signal(payload: dict, raw_body: bytes = b"") -> dict:
                     grade=payload.get("grade"), ai_score=filt.score, pine_score=pine_score,
                     signal_time=(signal_age_seconds_v and (now_utc.timestamp()-signal_age_seconds_v)),
                     v7_receive_time=now_utc.timestamp(),
-                    requested_price=entry,
-                    fill_price=_rd.get("price"), slippage=_rd.get("slippage"),
+                    requested_price=_rd.get("requested_price", entry),
+                    fill_price=_rd.get("fill_price") or _rd.get("price"),
+                    slippage=_rd.get("slippage"),
+                    bid=_rd.get("bid"), ask=_rd.get("ask"), spread=_rd.get("spread"),
                     fill_delay=_rd.get("fill_delay_ms"), broker_latency=_rd.get("latency_ms"),
                     requotes=_rd.get("requotes"), retry_count=_rd.get("retry_count"),
                 )

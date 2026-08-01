@@ -156,3 +156,51 @@ rejected vs what was taken. (Needs the same capture hook on the reject returns.)
 - **7 Live weight governor** — `weight_engine`/`discipline` already clamp [0.30,
   2.00]; tighten to **±10% per calibration + cooldown + rollback-on-drawdown** when
   Stage 6 signs off. Not before.
+
+---
+
+## Stage 2 COMPLETE (2026-08-01) — fill telemetry wired end-to-end
+
+The irrecoverable half is now captured. Three files, all changes LOG-ONLY:
+
+1. **`sniper_executor.py` (v7 bridge, Windows)** — times the broker round-trip and
+   returns execution facts in the `/execute` success response: `requested_price`,
+   `fill_price`, `slippage` (signed: +ve = filled worse), `bid`, `ask`, `spread`,
+   `latency_ms`, `retcode`. The order `req` and `order_send` are **byte-identical**
+   to before — the trade places exactly as it did.
+2. **`core/ic_markets.py` (v7 box)** — passes those fields through `returnData`
+   (they were dropped here before).
+3. **`bot.py` (v7 box)** — the existing guarded telemetry call now records bid/ask/
+   spread/fill/slippage/latency into `learning/telemetry.jsonl`.
+
+From the moment this deploys, every fill logs its true spread and slippage — the
+data that could never be recreated.
+
+### Deploy ceremony (backup → set secret → deploy → verify)
+
+⚠️ The git bridge reads `WEBHOOK_SECRET` from the environment (the hardcoded value
+was redacted out for git safety). So deploying it **requires** the env var — which
+is also the perfect moment to ROTATE the leaked secret.
+
+**On Windows (the bridge):**
+```powershell
+# 1. new secret (generate on the Linux box: openssl rand -hex 24), then set it:
+[Environment]::SetEnvironmentVariable("WEBHOOK_SECRET","<NEW_VALUE>","Machine")
+# 2. backup the running bridge
+copy C:\Users\Administrator\sniper_executor.py C:\Users\Administrator\sniper_executor.py.bak
+# 3. copy the new file over (scp from the box), then compile-check:
+& "C:\Program Files\Python311\python.exe" -m py_compile C:\Users\Administrator\sniper_executor.py
+# 4. restart + verify
+nssm restart SniperExecutorV7
+curl http://127.0.0.1:5001/health
+```
+
+**On the v7 box (bot.py + client):** normal deploy ceremony — backup, `git pull`,
+`python3 -c "import ast,sys; ast.parse(open('bot.py').read())"`, restart `sniper-bot`.
+
+**Then update the NEW secret in all three places so they match:** v7 `.env`
+(`WEBHOOK_SECRET=`), the TradingView alert JSON, and the bridge env var above.
+
+**Verify telemetry flows:** after the next fill, `tail -1 learning/telemetry.jsonl`
+should show non-null `spread`, `fill_price`, `slippage`, `latency_ms`. Then
+`nightly_edge.py` gains an execution-quality view automatically.

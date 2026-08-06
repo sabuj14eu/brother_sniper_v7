@@ -32,7 +32,21 @@ class EquityGuard:
     def update_balance(self,bal):
         today=date.today().isoformat(); wk=datetime.now(timezone.utc).strftime("%Y-W%W")
         if self.eq.day_date!=today: self.eq.day_open_balance=bal; self.eq.day_pnl=0.0; self.eq.day_date=today
-        if self.eq.week_num!=wk: self.eq.week_open_balance=bal; self.eq.week_pnl=0.0; self.eq.week_num=wk
+        if self.eq.week_num!=wk:
+            # [08-06 USER DECISION — Rule 7 rationale] WEEKLY SELF-REBASE.
+            # peak_balance only ever ratcheted up, so "<70% of peak" was a
+            # FOREVER-block and hard_stopped waited for a human /reset — the
+            # bot could sit dead for weeks on a demo account (Patch P in
+            # /reset exists because this already happened). Every new ISO
+            # week: clear the hard stop and re-anchor peak to the real
+            # balance. Within a week every protection is unchanged (risk
+            # ladder, tiers, streak brake). No blocked state survives 7 days
+            # without a human. Demo-account decision, logged.
+            if self.eq.hard_stopped or bal<self.eq.peak_balance:
+                log.warning(f"weekly rebase: peak {self.eq.peak_balance:.2f} -> {bal:.2f}, hard_stop cleared={self.eq.hard_stopped}")
+            self.eq.hard_stopped=False
+            self.eq.peak_balance=bal
+            self.eq.week_open_balance=bal; self.eq.week_pnl=0.0; self.eq.week_num=wk
         self.eq.day_pnl=bal-self.eq.day_open_balance; self.eq.week_pnl=bal-self.eq.week_open_balance
         if bal>self.eq.peak_balance: self.eq.peak_balance=bal
 

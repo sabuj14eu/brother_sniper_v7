@@ -16,8 +16,11 @@ ExecStart=/home/shyam/brother_sniper_v7/venv/bin/gunicorn \
 
 Restart=always
 RestartSec=10
-StartLimitInterval=120
-StartLimitBurst=5
+# Autonomy: never give up restarting. The old StartLimitBurst=5/120s meant
+# five quick failures and systemd abandoned the service until a human ran
+# `systemctl reset-failed` — a silent human-dependency. 0 = retry forever
+# (one attempt every RestartSec).
+StartLimitIntervalSec=0
 
 NoNewPrivileges=true
 PrivateTmp=true

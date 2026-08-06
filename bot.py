@@ -544,8 +544,14 @@ def _monitor():
                     )
                     guard=equity_guard.check(bal,state.get("consecutive_losses",0))
                     if state["consecutive_losses"]>=3 or not guard.allowed:
+                        # [08-06 USER DECISION] loss-streak pauses are SESSION-scoped
+                        # (auto-lift at next session); equity-guard pauses stay manual.
+                        state["pause_source"]="equity_guard" if not guard.allowed else "loss_streak"
+                        state["pause_session"]=_session_block()
                         state["paused"]=True; save_state()
-                        send_telegram(f"⛔ <b>BOT PAUSED</b>\n{equity_guard.status_summary(bal)}")
+                        _lift=("manual reset required (equity guard)" if state["pause_source"]=="equity_guard"
+                               else "auto-resumes next session")
+                        send_telegram(f"⛔ <b>BOT PAUSED</b> — {_lift}\n{equity_guard.status_summary(bal)}")
         except Exception as e: log.error(f"[MON] {e}",exc_info=True)
 
 def _spec_worker():
@@ -779,8 +785,20 @@ def handle_signal(payload: dict, raw_body: bytes = b"") -> dict:
     _mark_seen(sid); save_state()
 
     if state.get("paused") or state.get("consecutive_losses",0)>=3:
-        log.info(f"[GATE-PAUSED] {symbol} {direction} dropped — paused={state.get('paused')} losses={state.get('consecutive_losses',0)}")
-        return {"status":"paused","msg":"paused — POST /reset"}
+        # [08-06 USER DECISION — Rule 7 rationale logged] The 3-loss brake is
+        # SESSION-scoped: it auto-lifts when a new session starts (was: signals
+        # dropped forever until a manual POST /reset — the bot sat dead for
+        # hours/days). Worst case rises from 3 losses total to 3 per session;
+        # the equity-guard drawdown tiers below remain the hard backstop and
+        # THOSE pauses still require the manual reset.
+        if state.get("pause_source","loss_streak")!="equity_guard" and _session_block()!=state.get("pause_session"):
+            state["consecutive_losses"]=0; state["paused"]=False
+            state.pop("pause_session",None); save_state()
+            log.info(f"[GATE-PAUSED] auto-resume: new session ({_session_block()})")
+            send_telegram("▶️ <b>Auto-resumed</b> — new session, 3-loss pause lifted")
+        else:
+            log.info(f"[GATE-PAUSED] {symbol} {direction} dropped — paused={state.get('paused')} losses={state.get('consecutive_losses',0)}")
+            return {"status":"paused","msg":"paused — auto-resumes next session (equity-guard: POST /reset)"}
     # TASK 8: per-asset-class slot check (allow concurrent trades across classes)
     _ac = asset_class(symbol)
     _slot_trade = get_open_trade(_ac)
@@ -1212,6 +1230,15 @@ def status_route():
     try: bal=xtb.get_balance()
     except Exception: bal=0
     return jsonify({"state":state,"equity":equity_guard.status_summary(bal),"timestamp":datetime.now().isoformat()})
+
+def _session_block(now=None):
+    """Local-clock session bucket, same convention as session_caller:
+    hour <6 ASIA, <13 LONDON, else NY — date included so every session
+    boundary (and midnight) starts a fresh block."""
+    now = now or datetime.now()
+    sess = "ASIA" if now.hour < 6 else ("LONDON" if now.hour < 13 else "NY")
+    return f"{now.strftime('%Y%m%d')}-{sess}"
+
 
 @app.route("/reset",methods=["POST"])
 def reset_route():

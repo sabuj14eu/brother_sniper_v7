@@ -1083,6 +1083,13 @@ def handle_signal(payload: dict, raw_body: bytes = b"") -> dict:
             except Exception as _te:
                 log.warning(f"[TELEMETRY] capture skipped (non-fatal): {_te}")
 
+            # ── [08-07 v1.5] platform mirror: executed decision, fire-and-forget.
+            try:
+                from learning.platform_mirror import mirror_v7
+                mirror_v7(payload, "approved", "", order_id=order_id)
+            except Exception as _pm:
+                log.warning(f"[MIRROR] skipped (non-fatal): {_pm}")
+
             sl_diff=round(abs(inst_sl-raw_sl),2)
             arrow="🟢" if direction=="BUY" else "🔴"
             ev_tag=f"${ev:+.2f}" if cluster.trusted else f"~${ev:.2f} (learning)"
@@ -1189,6 +1196,12 @@ def webhook():
         if _st in ("rejected","blocked","filtered","skipped","paused"):
             from learning.telemetry import capture_reject
             capture_reject(payload, _st, str((result or {}).get("msg","")))
+        # ── [08-07 v1.5] platform mirror: every reject/block, fire-and-forget.
+        # "ignored" (Patch-H drops) included — those are decisions too.
+        # Read-only display; never blocks trading (daemon thread, 3s timeout).
+        if _st in ("rejected","blocked","filtered","skipped","paused","ignored"):
+            from learning.platform_mirror import mirror_v7
+            mirror_v7(payload, _st, str((result or {}).get("msg","")))
     except Exception as _re:
         log.warning(f"[REJECT-TELEMETRY] skipped (non-fatal): {_re}")
     return jsonify(result)

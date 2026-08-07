@@ -7,11 +7,14 @@ GOLD unbenched) — the clean-fleet baseline started 08-06/08-07.
 
 ## DECISIONS (explicit, Rule 7)
 
-1. **BENCH GOLD on v7** — asset_gate's own documented threshold met:
-   "bench (DISABLE) if PF < 0.7 at n>=30" → measured PF 0.65, n=33,
-   net −365, EV_lcb −0.50R, GOLD·SELL alone −292 (worst combo in the book).
-   `.env`: `ASSET_GATE_ENABLED=true`, `ASSET_GATE_DISABLE=GOLD`.
-   v7-only: the v18 council still judges gold; the bench is the mechanical arm.
+1. **GOLD: bench threshold met, USER OVERRODE the bench (08-07).**
+   Evidence on record: PF 0.65 at n=33 (gate's own bench bar is PF<0.7 at
+   n>=30), net −365, EV_lcb −0.50R, GOLD·SELL alone −292. The user's
+   explicit decision (Rule 7): gold keeps trading — no asset is disabled.
+   Offered compromise: `ASSET_GATE_SIZE=GOLD:0.5` (half size, every signal
+   still taken); final .env state is the user's choice. Note for next
+   review: gold's clean-era (18.12-fleet) record starts fresh — re-measure
+   there before re-raising the bench.
 
 2. **ETH: NOT benched yet** — n=17 < the n≥20 bar (WR 11.8%, PF 0.06 is
    dreadful but 17 trades is luck territory by law). Crosses n=20 soon;

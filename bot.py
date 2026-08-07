@@ -625,13 +625,22 @@ def handle_signal(payload: dict, raw_body: bytes = b"") -> dict:
         # ── Patch H: v17/v18 quality gate (belt + suspenders to Pine filtering)
         _grade = str(payload.get("grade","")).upper().strip()
         _v4rr  = bool(payload.get("v4_rr", False))
-        if _typ != "SMART_SCALP":
+        # [08-07 FIX] Patch H predates v18.7's PULLBACK trigger: every PULLBACK
+        # signal was dropped here as "noise", so the n=640-validated engine has
+        # NEVER traded on v7 — only through the v18 council. PULLBACK is now
+        # actionable. SESSION_CALL stays excluded on v7 by design: that lane is
+        # judged by the v18 council only — one path, one authority.
+        if _typ not in ("SMART_SCALP", "PULLBACK"):
             log.info(f"[v17v18-NOISE] dropped — type={_typ} not actionable")
             return {"status":"ignored","msg":f"{_sys} non-trade type"}
         if _grade not in ("A","A+","B"):
             log.info(f"[v17v18-FILTER] dropped grade-{_grade} signal from {_sys}")
             return {"status":"ignored","msg":f"{_sys} grade {_grade} below threshold"}
-        if not _v4rr:
+        # v4_rr exists only on SMART_SCALP payloads (a PULLBACK payload has no
+        # veto flags — bool(missing)=False was auto-killing them). PULLBACK's
+        # designed TP1 R:R is validated; the TP-FLOOR below upgrades to TP2
+        # when TP1 < 1R, and validate_rr(MIN_RR=1.0) still gates every trade.
+        if _typ == "SMART_SCALP" and not _v4rr:
             log.info(f"[v17v18-FILTER] dropped — v4_rr=False from {_sys}")
             return {"status":"ignored","msg":f"{_sys} v4_rr veto failed"}
         # [HYGIENE 08-01] was an obfuscated chr(39)... key ('symbol' WITH quote

@@ -530,6 +530,12 @@ def _monitor():
                     mem_close(tracked.get("signal_id","?"), float(cp), profit, swap, comm, hold_time_seconds=_hold, mae=_mae, mfe=_mfe,
                               be_done=bool(tracked.get("be_done")), partial_done=bool(tracked.get("partial_done")))
                     equity_guard.record_trade(net, tracked["symbol"])
+                    # ── [08-08 v1.5] platform mirror: trade OUTCOME, fire-and-forget.
+                    try:
+                        from learning.platform_mirror import mirror_v7_close
+                        mirror_v7_close(tracked, net, won, close_price=float(cp), hold_seconds=_hold)
+                    except Exception as _pm:
+                        log.warning(f"[MIRROR] close skipped (non-fatal): {_pm}")
                     state["equity"]=equity_guard.to_dict(); save_state()
                     bal=xtb.get_balance(); equity_guard.update_balance(bal)
 
@@ -1084,9 +1090,12 @@ def handle_signal(payload: dict, raw_body: bytes = b"") -> dict:
                 log.warning(f"[TELEMETRY] capture skipped (non-fatal): {_te}")
 
             # ── [08-07 v1.5] platform mirror: executed decision, fire-and-forget.
+            # 08-08: enriched with session/regime so Decision Lab buckets fill.
             try:
                 from learning.platform_mirror import mirror_v7
-                mirror_v7(payload, "approved", "", order_id=order_id)
+                mirror_v7(payload, "approved", "", order_id=order_id,
+                          session=filt.session,
+                          regime=(regime.regime if regime else None))
             except Exception as _pm:
                 log.warning(f"[MIRROR] skipped (non-fatal): {_pm}")
 

@@ -38,16 +38,24 @@ def mirror_enabled() -> bool:
 
 
 def build_v7_payload(payload: dict, status: str, reason: str = "",
-                     order_id=None) -> dict:
+                     order_id=None, session=None, regime=None,
+                     outcome=None) -> dict:
     """Map a v7 decision onto the platform webhook contract (v18-compatible).
 
     status_in: v7's own status word (rejected/blocked/filtered/skipped/
-    paused/ignored -> platform 'rejected'; executed open -> 'approved').
+    paused/ignored -> platform 'rejected'; executed open -> 'approved';
+    trade close -> 'closed' with an outcome dict).
     council 0/0 = non-council path, exactly how gate decisions render for v18.
+    All additions are APPEND-ONLY on the original contract.
     """
     p = payload or {}
-    approved = status == "approved"
-    return {
+    if status == "approved":
+        plat_status = "approved"
+    elif status == "closed":
+        plat_status = "closed"
+    else:
+        plat_status = "rejected"
+    body = {
         "signal_id": f"v7-{p.get('signal_id') or 'unknown'}",
         "system": "BSv7",
         "symbol": p.get("symbol"),
@@ -59,7 +67,7 @@ def build_v7_payload(payload: dict, status: str, reason: str = "",
         "rr": p.get("rr"),
         "grade": p.get("grade"),
         "council": {"approve": 0, "total": 0},
-        "status": "approved" if approved else "rejected",
+        "status": plat_status,
         "confidence": None,
         # append-only extras (platform passes unknown keys through)
         "v7_status": status,
@@ -67,7 +75,14 @@ def build_v7_payload(payload: dict, status: str, reason: str = "",
         "order_id": order_id,
         "pine_ver": p.get("pine_ver"),
         "type": p.get("type"),
+        # 08-08 enrichment: Decision Lab session/regime/tf buckets
+        "tf": p.get("tf"),
+        "session": session or p.get("session"),
+        "regime": regime,
     }
+    if outcome:
+        body["outcome"] = outcome
+    return body
 
 
 def _post_one(body: dict, url: str, secret: str) -> bool:
@@ -107,7 +122,10 @@ def _flush_queue(url: str, secret: str) -> None:
                 if _post_one(json.loads(ln), url, secret):
                     sent += 1
                 else:
-                    remaining.append(ln)
+                    # platform ANSWERED and refused (4xx/5xx): retrying the
+                    # identical payload can never succeed — drop it, don't
+                    # let rejected rows clog the queue forever.
+                    sent += 1
             except Exception:
                 remaining.append(ln)
                 remaining.extend(lines[i + 1:])   # platform still down; stop trying
@@ -130,16 +148,16 @@ def _worker(body: dict, url: str, secret: str) -> None:
             log.info(f"platform mirror: posted {body.get('signal_id')} "
                      f"status={body.get('status')} ({body.get('v7_status')})")
         else:
-            log.warning(f"platform mirror: non-2xx for {body.get('signal_id')} — queued")
-            _enqueue(body)
+            # answered-and-refused: drop (identical retry can't succeed)
+            log.warning(f"platform mirror: non-2xx for {body.get('signal_id')} — dropped")
     except Exception as e:
         log.warning(f"platform mirror: post failed ({type(e).__name__}) — queued")
         _enqueue(body)
     _flush_queue(url, secret)
 
 
-def mirror_v7(payload: dict, status: str, reason: str = "", order_id=None) -> None:
-    """Fire-and-forget mirror of one v7 decision. Never raises, never blocks."""
+def _fire(body: dict) -> None:
+    """Shared launch: flag + env checks, then daemon-thread post. Never raises."""
     try:
         if not mirror_enabled():
             return
@@ -149,7 +167,43 @@ def mirror_v7(payload: dict, status: str, reason: str = "", order_id=None) -> No
             log.warning("platform mirror: enabled but PLATFORM_WEBHOOK_URL/"
                         "PLATFORM_WEBHOOK_SECRET not set — skipping")
             return
-        body = build_v7_payload(payload, status, reason, order_id)
         threading.Thread(target=_worker, args=(body, url, secret), daemon=True).start()
     except Exception as e:
         log.warning(f"platform mirror: skipped ({type(e).__name__})")
+
+
+def mirror_v7(payload: dict, status: str, reason: str = "", order_id=None,
+              session=None, regime=None) -> None:
+    """Fire-and-forget mirror of one v7 decision. Never raises, never blocks."""
+    try:
+        _fire(build_v7_payload(payload, status, reason, order_id,
+                               session=session, regime=regime))
+    except Exception as e:
+        log.warning(f"platform mirror: skipped ({type(e).__name__})")
+
+
+def mirror_v7_close(tracked: dict, net: float, won: bool, close_price=None,
+                    hold_seconds=None) -> None:
+    """Mirror a trade OUTCOME (close) so the platform can join decision ->
+    result and compare v7 vs Scanner vs Strategy on the same signal_id.
+    Fire-and-forget; never raises, never blocks the monitor loop."""
+    try:
+        t = tracked or {}
+        pseudo = {
+            "signal_id": t.get("signal_id"),
+            "symbol": t.get("symbol"),
+            "direction": t.get("direction"),
+            "entry": t.get("entry"),
+        }
+        outcome = {
+            "win": bool(won),
+            "net": round(float(net), 2),
+            "close_price": close_price,
+            "ticket": t.get("order_id"),
+            "hold_seconds": int(hold_seconds) if hold_seconds else None,
+            "mae": t.get("mae"), "mfe": t.get("mfe"),
+        }
+        _fire(build_v7_payload(pseudo, "closed", order_id=t.get("order_id"),
+                               outcome=outcome))
+    except Exception as e:
+        log.warning(f"platform mirror: close skipped ({type(e).__name__})")

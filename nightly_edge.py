@@ -170,6 +170,7 @@ DIMENSIONS = {
     "session":  lambda t: t.get("session"),
     "regime":   lambda t: t.get("regime"),
     "strategy": lambda t: t.get("strategy_id"),                   # Stage 8 DNA (S1..S5)
+    "grade":    lambda t: t.get("grade"),                         # Pine grade (A+..D) — data-collection week
     "setup":    lambda t: t.get("setup_type") or t.get("type"),   # feature-store field
     "zone":     lambda t: t.get("zone") or t.get("loc_zone"),     # feature-store field
     "score":    lambda t: _band(t.get("ai_score"), [(0, 40, "<40"), (40, 55, "40-54"),
@@ -217,7 +218,7 @@ def summarize(trades, extractor, global_wr):
 
 # ── two-way combinations ─────────────────────────────────────────────────────
 
-COMBO_DIMS = ["symbol", "side", "session", "regime", "strategy", "setup", "zone"]
+COMBO_DIMS = ["symbol", "side", "session", "regime", "strategy", "setup", "zone", "grade"]
 
 
 def combinations(trades, global_wr, min_n=8):

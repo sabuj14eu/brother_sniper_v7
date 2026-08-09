@@ -639,7 +639,12 @@ def handle_signal(payload: dict, raw_body: bytes = b"") -> dict:
         if _typ not in ("SMART_SCALP", "PULLBACK"):
             log.info(f"[v17v18-NOISE] dropped — type={_typ} not actionable")
             return {"status":"ignored","msg":f"{_sys} non-trade type"}
-        if _grade not in ("A","A+","B"):
+        # [08-09 USER DECISION — time-boxed] V7_TRUST_ALL_GRADES=true lets v7
+        # trade C/D too for the grade data-collection week (Pine fcFireAllGrades
+        # ON). Every other v7 gate still applies (MIN_RR, SL floor, slots,
+        # margin, equity guard). Flip the env to false when the week ends.
+        _all_grades = os.getenv("V7_TRUST_ALL_GRADES","false").lower() in ("1","true","yes")
+        if _grade not in ("A","A+","B") and not _all_grades:
             log.info(f"[v17v18-FILTER] dropped grade-{_grade} signal from {_sys}")
             return {"status":"ignored","msg":f"{_sys} grade {_grade} below threshold"}
         # v4_rr exists only on SMART_SCALP payloads (a PULLBACK payload has no

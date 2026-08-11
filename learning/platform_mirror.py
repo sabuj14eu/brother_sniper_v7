@@ -79,6 +79,9 @@ def build_v7_payload(payload: dict, status: str, reason: str = "",
         "tf": p.get("tf"),
         "session": session or p.get("session"),
         "regime": regime,
+        # append-only join key: raw Pine id shared with the v18 arm's post
+        # for the same signal (platform joins the two lanes on this).
+        "pine_signal_id": p.get("signal_id"),
     }
     if outcome:
         body["outcome"] = outcome

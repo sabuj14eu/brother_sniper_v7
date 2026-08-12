@@ -64,13 +64,21 @@ def normalize(raw: list) -> list:
         except ValueError:
             continue
         cur = str(r.get("country") or "USD").upper()
-        out.append({
+        item = {
             "title": title,
             "event_time": when,
             "impact": str(r.get("impact") or "medium").lower(),
             "currency": cur,
             "affected_symbols": AFFECTED.get(cur, []),
-        })
+        }
+        # surprise dimension (append-only): forecast/previous ship pre-release;
+        # 'actual' fills in the feed post-release — landing it requires the
+        # platform ingest to update-on-conflict instead of skipping existing.
+        for k in ("forecast", "previous", "actual"):
+            v = r.get(k)
+            if v not in (None, ""):
+                item[k] = str(v)
+        out.append(item)
     return out
 
 

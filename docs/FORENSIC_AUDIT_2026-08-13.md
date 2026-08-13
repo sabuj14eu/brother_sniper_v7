@@ -8,6 +8,18 @@ Repos audited:
 
 ## 0. SCOPE CORRECTION — READ THIS FIRST
 
+> **AMENDED 2026-08-13, after publication.** The system described in the brief **does exist** — in
+> `sabuj14eu/Sniper-System`, branch `claude/brother-bot-trading-platform-58o7gr`, which was not
+> attached to this session. `decision_snapshot.py`, `opportunity.py`, `planner.py`
+> (`build_plan` / `build_session_call`), the three-lane template, SQLAlchemy models, Postgres and
+> 163 test functions are all there. The Autonomous Bot (auto-v1) also lives there, paper-only, as
+> designed. **This report audits the bot box only** — v18 brain, v7, session_caller, executors —
+> which is a genuinely separate codebase on separate hardware. Read every "does not exist" below as
+> "is not part of the bot box." Nothing is missing; two systems share a vocabulary.
+>
+> Cross-check worth recording: the platform independently detected ~2× stat inflation from outside,
+> and P0-2 below identifies the cause from inside. Two independent audits, same conclusion.
+
 The audit brief describes a system that **does not exist in these repositories**. Before any finding
 below can be read correctly, this has to be stated plainly.
 
@@ -207,6 +219,30 @@ be evaluated twice (entry, then manage) — but the canonical id is what stats m
 
 **Test.** POST the identical Pine body twice with a brain restart in between; assert exactly one
 canonical id in the journal and exactly one dispatch.
+
+> **STATUS UPDATE 2026-08-13 — the `pine_signal_id` fix is real but PARTIAL and UNMERGED.**
+> Verified across every remote branch of both bot repos. `pine_signal_id` appears exactly once,
+> in `brain/src/platform_mirror.py:84` on branch `origin/claude/brain-platform-mirror-fcacwl`:
+> ```python
+> "pine_signal_id": snap.get("signal_id"),   # join key for the platform
+> ```
+> What this **does** fix: the platform now receives Pine's real id on both arms' posts and can
+> collapse the v18/v7 twins. The externally-detected ~2× inflation is addressed **on the platform
+> side**.
+>
+> What it does **not** fix — confirmed by diffing that branch against `origin/main`:
+> - `decision_journal.py` is **untouched**. `new_signal_id()` still appends `secrets.token_hex(2)`,
+>   so the brain's own journal is still keyed on a random id.
+> - The 300 s dedupe (`main.py:130-135`) still ignores Pine's id and is still in-memory.
+> - The executor's duplicate guard (`executor_ic_markets/src/main.py:325`) is still keyed on the
+>   **minted** id and remains structurally blind to a duplicated Pine signal. The only changes to
+>   that file on the branch are an MT5 reconnect fix and a new `/cansize` endpoint.
+> - **The branch is not merged.** `origin/main` is still `bcea0f9`; `git grep pine_signal_id
+>   origin/main` returns nothing in either repo.
+>
+> Net: the platform is protected from double-counting; **the bot box's own journal and idempotency
+> guard are not**. P0-2 should not be considered closed. Residual risk if Pine ever omits
+> `signal_id`: `snap.get("signal_id")` yields `None` and the platform loses its join key silently.
 
 ---
 
@@ -890,8 +926,12 @@ Strictly no strategy work until P0 is clear. The brief's rule is right and I am 
 18. Scope the news gate by symbol; make the window asymmetric; measure blocked-minutes/day first. *(P1-5)*
 19. Fail loudly when `BRAIN_DISPATCH_MODE` is unset; surface it on the dashboard. *(P1-7)*
 20. Remove `state.json` from version control; add outcome-store bounds and rotation. *(D-6, D-5)*
-21. **Put the Pine source in `pinev18.6`.** The strategy's primary logic is currently unversioned,
-    undiffable, and unauditable — and Iron Rule 3's alert ceremony has no artefact to anchor to.
+21. ~~**Put the Pine source in `pinev18.6`.**~~ **CORRECTED 2026-08-13:** the Pine source *is*
+    versioned — in `Sniper-System`, branch `claude/brother-bot-trading-platform-58o7gr`, under
+    `pine/` (includes the ATR zero-division fix, commit `f0f2808`). It is not unversioned; it simply
+    does not live in `pinev18.6`. Residual action is smaller: **`pinev18.6` is an empty repo with no
+    commits and no purpose** — either delete it or make it a pointer, so nobody audits the wrong
+    place again (as this report initially did).
 22. Reconcile Iron Rule 1 with `approve_from_pine`, in writing. *(P1-6)*
 
 ### P3 — improvements

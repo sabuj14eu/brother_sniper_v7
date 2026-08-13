@@ -55,6 +55,23 @@ SYMBOL_MAP = {
 }
 
 # ── MT5 CONNECTION MANAGEMENT ───────────────────────────────────────────────
+_off_cache = {"t": 0.0, "off": 0}
+def _broker_utc_offset():
+    """Broker-clock minus UTC, seconds (cached 1h). BTCUSD ticks 24/7 so its
+    tick time is a live broker clock. [AUDIT BOT-P0-4] candle epochs are
+    broker time; consumers compare against UTC — normalize at the source."""
+    import time as _t
+    now = _t.time()
+    if now - _off_cache["t"] < 3600:
+        return _off_cache["off"]
+    try:
+        tk = mt5.symbol_info_tick("BTCUSD")
+        if tk and tk.time and abs(tk.time - now) < 6 * 3600:
+            _off_cache.update(t=now, off=int(round((tk.time - now) / 1800.0) * 1800))
+    except Exception:
+        pass
+    return _off_cache["off"]
+
 def ensure_mt5():
     """Ensure MT5 is connected. Returns True if healthy, False if dead."""
     acc = mt5.account_info()
@@ -327,14 +344,16 @@ def candles():
         tf = tf_map.get(tf_str, mt5.TIMEFRAME_M15)
         if not mt5.symbol_select(symbol, True):
             return jsonify({"status":"error","msg":f"symbol select failed: {symbol}"}), 400
-        rates = mt5.copy_rates_from_pos(symbol, tf, 0, n)
+        # [AUDIT BOT-P0-3] start=1: CLOSED bars only — the live bar repaints
+        rates = mt5.copy_rates_from_pos(symbol, tf, 1, n)
         if rates is None or len(rates) == 0:
             return jsonify({"status":"error","msg":f"no candles for {symbol}",
                             "last_error":str(mt5.last_error())}), 400
-        rows = [{"time":int(r["time"]), "open":float(r["open"]), "high":float(r["high"]),
+        _off = _broker_utc_offset()
+        rows = [{"time":int(r["time"]) - _off, "open":float(r["open"]), "high":float(r["high"]),
                  "low":float(r["low"]), "close":float(r["close"]),
                  "volume":int(r["tick_volume"])} for r in rates]
-        return jsonify({"status":"ok","symbol":symbol,"tf":tf_str,"count":len(rows),"rows":rows})
+        return jsonify({"status":"ok","symbol":symbol,"tf":tf_str,"count":len(rows),"rows":rows,"closed_only":True,"utc_normalized":True})
     except Exception as e:
         log.error(f"[CANDLES] error: {e}")
         return jsonify({"status":"error","msg":str(e)}), 500

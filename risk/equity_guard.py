@@ -1,12 +1,17 @@
 import logging
+import os
 from datetime import datetime,timezone,date
 from dataclasses import dataclass,field
 from typing import Optional
 
 log=logging.getLogger("sniper.equity_guard")
-DAILY_DD_LIMIT_PCT = 0.99
-TOTAL_DD_LIMIT_PCT = 0.99
-WEEKLY_DD_LIMIT_PCT = 0.99
+# [AUDIT BOT-P0-5] 0.99 = guards EFFECTIVELY DISABLED (a prior demo-phase
+# choice, kept: changing limits is a human risk decision — Rule 7). Now
+# env-overridable so the human can set real values without code edits, and
+# every block message derives from the constant instead of lying "20pct".
+DAILY_DD_LIMIT_PCT = float(os.getenv("EG_DAILY_DD_PCT", "0.99"))
+TOTAL_DD_LIMIT_PCT = float(os.getenv("EG_TOTAL_DD_PCT", "0.99"))
+WEEKLY_DD_LIMIT_PCT = float(os.getenv("EG_WEEKLY_DD_PCT", "0.99"))
 RISK_SCALE_TABLE=[(0.90,1.00),(0.80,0.75),(0.70,0.50),(0.00,0.00)]
 
 @dataclass
@@ -69,7 +74,7 @@ class EquityGuard:
             return self._block("total",daily_used,weekly_used,equity_pct,"HARD STOP: manual reset required")
         if total_loss>=total_limit:
             eq.hard_stopped=True
-            return self._block("total",daily_used,weekly_used,equity_pct,"Total DD 20pct hit")
+            return self._block("total",daily_used,weekly_used,equity_pct,f"Total DD {TOTAL_DD_LIMIT_PCT*100:.0f}pct hit")
         if weekly_loss>=weekly_limit:
             return self._block("weekly",daily_used,weekly_used,equity_pct,"Weekly limit hit")
         if daily_loss>=daily_limit:

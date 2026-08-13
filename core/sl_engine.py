@@ -35,7 +35,15 @@ def calculate_institutional_sl(symbol,direction,entry,raw_sl,atr=None,swing_low=
         method="min_pct_floor"
     if sl_distance>max_dist:
         rejection=f"SL distance {sl_distance:.2f} exceeds max {max_dist:.2f}. Setup too risky."
-    sl_final=round(sl_raw,2)
+    # [AUDIT BOT-P0-6] round(_,2) corrupted 5-digit FX stops (1.08350 -> 1.08);
+    # per-symbol digits, then RECOMPUTE distance/limits on the rounded price.
+    _PXD={"GOLD":2,"SILVER":3,"BITCOIN":2,"ETHEREUM":2,"LITECOIN":2,"RIPPLE":4,
+          "USDJPY":3,"EURUSD":5,"GBPUSD":5,"AUDUSD":5,"NZDUSD":5,"USDCAD":5,"USDCHF":5,
+          "US30":1,"USTEC":1}
+    sl_final=round(sl_raw,_PXD.get(symbol,2))
+    sl_distance=abs(entry-sl_final)
+    if sl_distance>max_dist and not rejection:
+        rejection=f"SL distance {sl_distance:.5f} exceeds max {max_dist:.5f} after rounding."
     log.info(f"[SL] {symbol} {direction}: entry={entry} final_sl={sl_final} dist={sl_distance:.2f} method={method}")
     return SLResult(sl_price=sl_final,sl_distance=sl_distance,method=method,atr_used=atr_val,fakeout_pad=pad,within_limits=not rejection,rejection_reason=rejection)
 

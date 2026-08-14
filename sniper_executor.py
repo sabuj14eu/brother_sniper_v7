@@ -72,6 +72,25 @@ def _broker_utc_offset():
         pass
     return _off_cache["off"]
 
+def _tick_spread(symbol):
+    """Live bid/ask/spread for one broker symbol. Read-only, never raises —
+    the analytics spread-at-decision source (Pine's v6_spread is only a
+    range-stress proxy, not real spread)."""
+    try:
+        sym = SYMBOL_MAP.get(str(symbol or "").upper(), str(symbol or "").upper())
+        tk = mt5.symbol_info_tick(sym)
+        info = mt5.symbol_info(sym)
+        if not tk or not tk.bid or not tk.ask:
+            return {"symbol": sym, "spread": None}
+        spread = float(tk.ask) - float(tk.bid)
+        point = float(getattr(info, "point", 0) or 0)
+        return {"symbol": sym, "bid": float(tk.bid), "ask": float(tk.ask),
+                "spread": round(spread, 8),
+                "spread_points": round(spread / point, 1) if point > 0 else None}
+    except Exception:
+        return {"symbol": symbol, "spread": None}
+
+
 def ensure_mt5():
     """Ensure MT5 is connected. Returns True if healthy, False if dead."""
     acc = mt5.account_info()
@@ -100,6 +119,11 @@ else:
         log.warning("MT5 initialize() returned True but account_info() is None")
 
 # ── ROUTES ──────────────────────────────────────────────────────────────────
+@app.route("/spread", methods=["GET"])
+def spread_route():
+    return jsonify(_tick_spread(request.args.get("symbol", "")))
+
+
 @app.route("/health", methods=["GET"])
 def health():
     if not ensure_mt5():
@@ -353,7 +377,11 @@ def candles():
         rows = [{"time":int(r["time"]) - _off, "open":float(r["open"]), "high":float(r["high"]),
                  "low":float(r["low"]), "close":float(r["close"]),
                  "volume":int(r["tick_volume"])} for r in rates]
-        return jsonify({"status":"ok","symbol":symbol,"tf":tf_str,"count":len(rows),"rows":rows,"closed_only":True,"utc_normalized":True})
+        _sp = _tick_spread(symbol)
+        return jsonify({"status":"ok","symbol":symbol,"tf":tf_str,"count":len(rows),"rows":rows,
+                        "closed_only":True,"utc_normalized":True,
+                        "spread":_sp.get("spread"),"spread_points":_sp.get("spread_points"),
+                        "bid":_sp.get("bid"),"ask":_sp.get("ask")})
     except Exception as e:
         log.error(f"[CANDLES] error: {e}")
         return jsonify({"status":"error","msg":str(e)}), 500

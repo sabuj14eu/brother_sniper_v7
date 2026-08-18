@@ -67,6 +67,8 @@ def enabled_entries(registry: dict) -> dict:
     """Canonical -> entry for entries explicitly enabled. Bad shapes skipped."""
     out = {}
     for canon, entry in (registry or {}).items():
+        if str(canon).startswith("_"):
+            continue  # _README and friends — documentation keys, not symbols
         if not isinstance(entry, dict):
             log.warning(f"[SYMBOLS] {canon}: entry is not an object — skipped")
             continue

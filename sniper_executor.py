@@ -45,7 +45,13 @@ SYMBOL_MAP = {
     # Crypto — ETH variants now mapped (was missing in v2)
     "BITCOIN":"BTCUSD", "BTCUSD":"BTCUSD", "BTC":"BTCUSD", "BTCUSDT":"BTCUSD",
     "ETHEREUM":"ETHUSD", "ETHUSD":"ETHUSD", "ETH":"ETHUSD", "ETHUSDT":"ETHUSD",
-    "XRP":"XRPUSD", "XRPUSD":"XRPUSD", "XRPUSDT":"XRPUSD",
+    "XRP":"XRPUSD", "XRPUSD":"XRPUSD", "XRPUSDT":"XRPUSD", "RIPPLE":"XRPUSD",
+    "LITECOIN":"LTCUSD", "LTCUSD":"LTCUSD", "LTC":"LTCUSD",
+    # Altcoin candidates (bench-listed in config/symbols.json until broker
+    # specs are verified; unknown symbols pass through verbatim anyway)
+    "SOLANA":"SOLUSD", "SOLUSD":"SOLUSD", "SOL":"SOLUSD", "SOLUSDT":"SOLUSD",
+    "CARDANO":"ADAUSD", "ADAUSD":"ADAUSD", "ADA":"ADAUSD", "ADAUSDT":"ADAUSD",
+    "CHAINLINK":"LINKUSD", "LINKUSD":"LINKUSD", "LINK":"LINKUSD", "LINKUSDT":"LINKUSD",
     # Forex
     "EURUSD":"EURUSD", "USDJPY":"USDJPY", "GBPUSD":"GBPUSD",
     "AUDUSD":"AUDUSD", "USDCAD":"USDCAD", "USDCHF":"USDCHF",

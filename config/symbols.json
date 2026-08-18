@@ -1,1 +1,57 @@
-{}
+{
+  "_README": "Symbol registry — overlays the hard-coded dicts in bot.py / core at boot. Schema in core/symbol_registry.py. Entries stay enabled:false (BENCH-LISTED: aliases unknown, signals 'unsupported') until the enable ceremony in config/README.md is done: broker offers the instrument, spec verified on the MT5 terminal, bridge deployed, then flip enabled and restart. tests/test_symbol_registry.py enforces that every committed entry is benched.",
+
+  "SOLANA": {
+    "enabled": false,
+    "note": "SPECS UNVERIFIED — placeholder values. Confirm instrument name, tickSize/tickValue, lot min/step/max and typical spread in the MT5 spec window before enabling.",
+    "aliases": ["SOLUSD", "SOL", "SOLUSDT"],
+    "mt5": "SOLUSD",
+    "asset_class": "crypto",
+    "digits": 2,
+    "price_range": [5, 2000],
+    "always_open": true,
+    "fakeout_pad": 0.0,
+    "min_sl_pct": 0.015,
+    "max_sl_pct": 0.10,
+    "atr_est_pct": 0.03,
+    "demo_max_lot": 1.0,
+    "min_lot": 0.01,
+    "spec": {"tickSize": 0.01, "tickValue": 0.01, "lotMin": 0.01, "lotMax": 100.0, "lotStep": 0.01}
+  },
+
+  "CARDANO": {
+    "enabled": false,
+    "note": "SPECS UNVERIFIED — placeholder values. Confirm on the MT5 terminal before enabling. Expect long flat stretches; per-symbol stats stay separate (n<20 = provisional).",
+    "aliases": ["ADAUSD", "ADA", "ADAUSDT"],
+    "mt5": "ADAUSD",
+    "asset_class": "crypto",
+    "digits": 4,
+    "price_range": [0.05, 20],
+    "always_open": true,
+    "fakeout_pad": 0.0,
+    "min_sl_pct": 0.02,
+    "max_sl_pct": 0.10,
+    "atr_est_pct": 0.035,
+    "demo_max_lot": 1.0,
+    "min_lot": 0.01,
+    "spec": {"tickSize": 0.0001, "tickValue": 0.0001, "lotMin": 0.01, "lotMax": 100.0, "lotStep": 0.01}
+  },
+
+  "CHAINLINK": {
+    "enabled": false,
+    "note": "SPECS UNVERIFIED — placeholder values. If the broker does not offer LINK, the fallback is LITECOIN, which is already fully wired in the hard-coded dicts.",
+    "aliases": ["LINKUSD", "LINK", "LNKUSD", "LINKUSDT"],
+    "mt5": "LINKUSD",
+    "asset_class": "crypto",
+    "digits": 3,
+    "price_range": [1, 500],
+    "always_open": true,
+    "fakeout_pad": 0.0,
+    "min_sl_pct": 0.02,
+    "max_sl_pct": 0.10,
+    "atr_est_pct": 0.035,
+    "demo_max_lot": 1.0,
+    "min_lot": 0.01,
+    "spec": {"tickSize": 0.001, "tickValue": 0.001, "lotMin": 0.01, "lotMax": 100.0, "lotStep": 0.01}
+  }
+}

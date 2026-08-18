@@ -133,6 +133,18 @@ def test_entry_points_never_raise(monkeypatch):
     vs.update_heartbeat({}, {})
 
 
+def test_heartbeat_push_throttled(tmp_path, monkeypatch):
+    """File writes every cycle; the platform push at most every HB_PUSH_MIN_S."""
+    monkeypatch.setattr(vs, "STATUS_FILE", str(tmp_path / "v7_status.json"))
+    monkeypatch.setattr(vs, "_last_hb_push", -float(vs.HB_PUSH_MIN_S))
+    pushes = []
+    monkeypatch.setattr(vs, "_push", lambda rec, path: pushes.append(path))
+    vs.update_heartbeat({"open_trades": {}}, {})
+    vs.update_heartbeat({"open_trades": {}}, {})  # within throttle window
+    assert pushes == ["/webhooks/brain/artifact"]  # exactly one push
+    assert (tmp_path / "v7_status.json").exists()  # but the file still wrote
+
+
 def test_push_disabled_by_default(monkeypatch):
     monkeypatch.delenv("PLATFORM_URL", raising=False)
     monkeypatch.delenv("PLATFORM_SECRET", raising=False)

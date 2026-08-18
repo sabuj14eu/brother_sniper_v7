@@ -48,6 +48,9 @@ _lock = threading.Lock()
 _decisions: deque = deque(maxlen=MAX_DECISIONS)
 _heartbeat: dict = {}
 _loaded = False
+HB_PUSH_MIN_S = 240  # local file refreshes every cycle; the platform push is
+                     # throttled so ~60s cycles become ~5-minute artifact rows
+_last_hb_push = -float(HB_PUSH_MIN_S)  # first heartbeat always pushes
 
 
 # ── gate classification ──────────────────────────────────────────────────────
@@ -273,11 +276,15 @@ def update_heartbeat(state: dict, guard: dict | None = None, **kw) -> None:
     global _heartbeat
     try:
         hb = build_heartbeat(state, guard, **kw)
+        global _last_hb_push
         with _lock:
             _heartbeat = hb
         _write_status()
         # artifacts endpoint expects kind/generated_at; extra keys pass through
-        _push({**hb, "generated_at": hb.get("ts"),
-               "title": "v7 heartbeat"}, "/webhooks/brain/artifact")
+        import time as _t
+        if _t.monotonic() - _last_hb_push >= HB_PUSH_MIN_S:
+            _last_hb_push = _t.monotonic()
+            _push({**hb, "generated_at": hb.get("ts"),
+                   "title": "v7 heartbeat"}, "/webhooks/brain/artifact")
     except Exception as e:  # pragma: no cover - defensive
         log.warning(f"[V7-STATUS] update_heartbeat skipped (non-fatal): {e}")

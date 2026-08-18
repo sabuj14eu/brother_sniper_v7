@@ -46,6 +46,18 @@ SYMBOL_MAP = {
     "BITCOIN":"BTCUSD", "BTCUSD":"BTCUSD", "BTC":"BTCUSD", "BTCUSDT":"BTCUSD",
     "ETHEREUM":"ETHUSD", "ETHUSD":"ETHUSD", "ETH":"ETHUSD", "ETHUSDT":"ETHUSD",
     "XRP":"XRPUSD", "XRPUSD":"XRPUSD", "XRPUSDT":"XRPUSD",
+    # [08-19 BUG FOUND BY THE SPEC PROBE] The v7 BOT renames XRPUSD -> "RIPPLE"
+    # and LTCUSD -> "LITECOIN" internally, then sends THAT name here. Neither
+    # key existed in this map, so "RIPPLE" was passed to MT5 verbatim as an
+    # unknown symbol and every v7 XRP/LTC order died at the broker — invisible
+    # until an order was actually attempted. Aliases must cover the BOT's
+    # vocabulary, not just the broker's.
+    "RIPPLE":"XRPUSD",
+    "LITECOIN":"LTCUSD", "LTCUSD":"LTCUSD", "LTC":"LTCUSD",
+    # staging candidates (probe confirmed SOL/ADA exist and are FULL tradable)
+    "SOLANA":"SOLUSD", "SOLUSD":"SOLUSD", "SOL":"SOLUSD",
+    "CARDANO":"ADAUSD", "ADAUSD":"ADAUSD", "ADA":"ADAUSD",
+    "CHAINLINK":"LINKUSD", "LINKUSD":"LINKUSD", "LINK":"LINKUSD",
     # Forex
     "EURUSD":"EURUSD", "USDJPY":"USDJPY", "GBPUSD":"GBPUSD",
     "AUDUSD":"AUDUSD", "USDCAD":"USDCAD", "USDCHF":"USDCHF",

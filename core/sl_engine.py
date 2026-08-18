@@ -8,6 +8,7 @@ FAKEOUT_PAD = {"GOLD":8.0,"SILVER":0.12,"BITCOIN":300.0,"ETHEREUM":25.0,"LITECOI
 ATR_MULTIPLIER = 1.2
 MIN_SL_PCT = {"GOLD":0.010,"SILVER":0.010,"BITCOIN":0.012,"ETHEREUM":0.015,"LITECOIN":0.020,"RIPPLE":0.020,"USDJPY":0.0010,"EURUSD":0.0010,"GBPUSD":0.0010,"AUDUSD":0.0010,"NZDUSD":0.0010,"USDCAD":0.0010,"USDCHF":0.0010,"US30":0.0015,"USTEC":0.0015}  # metals floors raised 2026-06-26: <1% stops bled -432 (17%WR) vs >1% +280 (80%WR)
 MAX_SL_PCT = {"GOLD":0.040,"SILVER":0.050,"BITCOIN":0.100,"ETHEREUM":0.120,"LITECOIN":0.060,"RIPPLE":0.060,"USDJPY":0.008,"EURUSD":0.008,"GBPUSD":0.008,"AUDUSD":0.008,"NZDUSD":0.008,"USDCAD":0.008,"USDCHF":0.008,"US30":0.015,"USTEC":0.015}
+ATR_EST_PCT = {"GOLD":0.0085,"SILVER":0.0120,"BITCOIN":0.0300,"ETHEREUM":0.0350,"LITECOIN":0.0400,"RIPPLE":0.0350,"US30":0.005,"USTEC":0.008}
 
 @dataclass
 class SLResult:
@@ -40,7 +41,7 @@ def calculate_institutional_sl(symbol,direction,entry,raw_sl,atr=None,swing_low=
     return SLResult(sl_price=sl_final,sl_distance=sl_distance,method=method,atr_used=atr_val,fakeout_pad=pad,within_limits=not rejection,rejection_reason=rejection)
 
 def _estimate_atr(symbol,entry):
-    pct={"GOLD":0.0085,"SILVER":0.0120,"BITCOIN":0.0300,"ETHEREUM":0.0350,"LITECOIN":0.0400,"RIPPLE":0.0350,"US30":0.005,"USTEC":0.008}.get(symbol,0.010)
+    pct=ATR_EST_PCT.get(symbol,0.010)
     return entry*pct
 
 def validate_rr(entry,sl_price,tp,direction,min_rr=1.5):

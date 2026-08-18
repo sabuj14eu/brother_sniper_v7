@@ -11,6 +11,22 @@ SYMBOL_MAP_CT = {
 
 SECRET = os.getenv("WEBHOOK_SECRET","")
 
+# Hoisted to module level (2026-08-18) so the symbol registry can overlay new
+# instruments; values unchanged. Crypto list drives the 24/7 market-hours
+# exemption; lot tables are the demo-mode safety caps from Patch E / F4.
+CRYPTO_247 = ["BITCOIN","ETHEREUM","LITECOIN","RIPPLE","BTCUSD","ETHUSD"]
+DEMO_MAX_LOT = {
+    "GOLD": 0.50, "SILVER": 0.50,
+    "BITCOIN": 0.10, "ETHEREUM": 0.50,
+    "LITECOIN": 1.00, "RIPPLE": 1.00,
+    "USDJPY": 1.00, "EURUSD": 1.00, "GBPUSD": 1.00,
+    "AUDUSD": 1.00, "NZDUSD": 1.00, "USDCAD": 1.00, "USDCHF": 1.00,
+    "US30": 1.00, "USTEC": 1.00,   # [F4 2026-07-02] were missing -> generic 0.10 cap masked bad sizing
+}
+MIN_LOT = {            # per-symbol broker minimum volume
+    "US30": 0.10, "USTEC": 0.10, "US500": 0.10,   # index CFDs reject 0.01
+}
+
 class ICMarketsClient:
     def __init__(self):
         self.executor_url = os.getenv("EXECUTOR_URL","")
@@ -99,7 +115,7 @@ class ICMarketsClient:
         hour = now.hour
 
         # Crypto trades 24/7
-        if symbol in ["BITCOIN","ETHEREUM","LITECOIN","RIPPLE","BTCUSD","ETHUSD"]:
+        if symbol in CRYPTO_247:
             return True
 
         # Metals/Forex closed Saturday and Sunday before 22:00 UTC
@@ -114,20 +130,9 @@ class ICMarketsClient:
 
     def open_trade(self, symbol, direction, volume, sl, tp, comment="BS"):
         ct_symbol = SYMBOL_MAP_CT.get(symbol, symbol)
-        # Patch E: respect calc_lot() output. Per-symbol safety caps below.
-        # Demo-mode hard ceilings — well above 0.5% risk on $6k acct, but stops
-        # any wild calc_lot() blow-up from sending 50-lot trades on a $6k demo.
-        DEMO_MAX_LOT = {
-            "GOLD": 0.50, "SILVER": 0.50,
-            "BITCOIN": 0.10, "ETHEREUM": 0.50,
-            "LITECOIN": 1.00, "RIPPLE": 1.00,
-            "USDJPY": 1.00, "EURUSD": 1.00, "GBPUSD": 1.00,
-            "AUDUSD": 1.00, "NZDUSD": 1.00, "USDCAD": 1.00, "USDCHF": 1.00,
-            "US30": 1.00, "USTEC": 1.00,   # [F4 2026-07-02] were missing -> generic 0.10 cap masked bad sizing
-        }
-        MIN_LOT = {            # per-symbol broker minimum volume
-            "US30": 0.10, "USTEC": 0.10, "US500": 0.10,   # index CFDs reject 0.01
-        }
+        # Patch E: respect calc_lot() output. Per-symbol safety caps in the
+        # module-level DEMO_MAX_LOT / MIN_LOT tables above — demo-mode hard
+        # ceilings that stop any wild calc_lot() blow-up on a $6k demo.
         vol = round(max(MIN_LOT.get(symbol, 0.01), min(volume, DEMO_MAX_LOT.get(symbol, 0.10))), 2)
         if vol != round(volume, 2):
             log.info(f"[CT] lot adjusted: requested {volume} → sent {vol} (cap={DEMO_MAX_LOT.get(symbol,0.10)})")

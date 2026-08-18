@@ -177,6 +177,20 @@ SAFE_SPECS = {
     "USTEC":   {"tickSize":0.1,   "tickValue":0.10,"lotMin":0.10,"lotMax":50.0, "lotStep":0.10,"_source":"fallback"},
 }
 
+# ── Symbol registry (config/symbols.json) — OVERLAYS the dicts above at boot.
+# Missing/empty/corrupt file applies nothing: behavior is identical to the
+# hard-coded fallbacks. New instruments are added there, not here.
+_REG_PRICE_RANGES = {}   # canonical -> (lo, hi); merged into the price gate
+_REG_ASSET_CLASS  = {}   # canonical -> slot name; consulted by asset_class()
+try:
+    from core.symbol_registry import apply_registry as _apply_symreg
+    _applied_syms = _apply_symreg(symbol_map=SYMBOL_MAP, allowed=ALLOWED_SYMBOLS,
+                                  px_digits=_PX_DIGITS, safe_specs=SAFE_SPECS,
+                                  price_ranges=_REG_PRICE_RANGES,
+                                  asset_class_map=_REG_ASSET_CLASS)
+except Exception as _sre:
+    log.warning(f"[SYMBOLS] registry load skipped (non-fatal): {_sre}")
+
 # ━━ IP + Rate ──────────────────────━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 _TV_CIDRS = ["52.89.214.238/32","34.212.75.30/32","54.218.53.128/32","52.32.178.7/32",
              "54.237.33.0/24","52.0.239.0/24","52.1.168.0/24","34.200.0.0/16","18.214.0.0/16"]
@@ -225,6 +239,8 @@ ASSET_SLOTS = ("metals", "crypto", "forex", "other")
 def asset_class(symbol):
     """Categorize a symbol into one of 4 concurrent trade slots."""
     if not symbol: return "other"
+    _reg = _REG_ASSET_CLASS.get(str(symbol).upper())
+    if _reg in ASSET_SLOTS: return _reg           # registry override (new symbols)
     s = str(symbol).upper().replace("USDT","").replace("USD","")
     if s in ("SILVER","GOLD","XAU","XAG","XAUUSD","XAGUSD","XAGEUR","XAUEUR"): return "metals"
     if s in ("BTC","ETH","XRP","ETHEREUM","BITCOIN","SOL","DOGE","ADA","BCH","LTC"): return "crypto"
@@ -702,6 +718,7 @@ def handle_signal(payload: dict, raw_body: bytes = b"") -> dict:
             "US30":  (20000, 60000),
             "USTEC": (10000, 50000),
         }
+        _PRICE_RANGES.update(_REG_PRICE_RANGES)   # registry overlay (empty = no-op)
         _lo, _hi = _PRICE_RANGES.get(symbol, (None, None))
         if _lo is not None and not (_lo <= entry <= _hi):
             log.warning(f"[GATE-PRICE] {symbol} entry={entry} outside expected range ({_lo}-{_hi}) - likely Pine template applied to wrong chart. REJECTING.")

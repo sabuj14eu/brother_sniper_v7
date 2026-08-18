@@ -51,13 +51,33 @@ Per-repo state:
 | `brother_sniper_v7` | mechanical arm | 8.2k LoC. 27-gate cascade in `bot.py:582-1144`. Emits NOTHING outward (Telegram + local JSONL only). Symbols hard-coded in ~10 dicts across 4 files. |
 | `brother-brain-v2` | v18 brain + dashboard | **No database anywhere** — everything is append-only JSONL + JSON state. No Trade Desk page, no Desk State, no DecisionEvent model. Dashboard is stateless pull. `platform_mirror.py` and `push_bias.py` are the only outbound pushes. |
 | `session_caller` | paper session caller | 3×/day, pure math, $0 AI, reads bridge candles, writes `session_calls.json`. The proven template for deterministic session logic. |
-| `pinev18.6` | **EMPTY** | Zero commits, locally and on origin. The Pine source lives only on TradingView. (Recommend: paste the current script in as commit #1 — Iron Rule 3's ceremony depends on knowing what version is live.) |
+| `pinev18.6` | **EMPTY — a trap** | Zero commits, locally and on origin. The name looks right; there is nothing in it. |
 
-The **Brother Bot Platform** (`app.signalmesh.dev`, `/srv/brotherbot`, docker
-compose, `BB_AI_WEEKLY_BUDGET_USD`) is a **separate codebase not in this
-session's repos**. It is the consumer of the `/v7` page feed specced in §4.
-The `BB_AI_WEEKLY_BUDGET_USD` env one-liner in the hand-off note must be run on
-that box by the operator; it cannot be done from these repos.
+**Where Pine actually lives** (corrected 2026-08-18): repo
+`sabuj14eu/sniper-system`, `pine/BrotherSniperULTIMATE_v18_FINAL_v6.pine` —
+Pine v6, `pine_ver "18.12"`, ~2,898 lines, 5 `alert()` calls (PULLBACK
+BUY/SELL, SMART_SCALP BUY/SELL, opt-in MANUAL_GATE). Companion
+`BrotherSniper_AssetPulse_v1.pine` is display-only by design (no alerts, no
+webhook). Second trap: `brother-brain-v2/brain/src/agents/
+BrotherSniperULTIMATE_v18_FINAL (5).pine` is a STALE v18.7-era snapshot —
+never read it as current; it predates the v18.9→18.12 arc. The live-version
+check (from the brain box) proves what is actually running, because alerts
+freeze the script at creation:
+`grep -o '"pine_ver":"[^"]*"' /home/shyam/brain-v2/brain/logs/decisions.jsonl | sort | uniq -c`
+— anything other than `18.12` (or `session_caller`) means frozen alerts and
+the alert ceremony is due, not a re-paste.
+
+The **Brother Bot Platform** (`app.signalmesh.dev`, `/srv/brotherbot`) is the
+same `sniper-system` repo (FastAPI + Jinja + SQLAlchemy, Anthropic via a
+single `ai_ledger` door, `BB_AI_WEEKLY_BUDGET_USD` rolling 7-day cap in
+`app/services/ai_ledger.py`). Crucially, **its v7 ingest contract already
+exists**: `POST {PLATFORM_URL}/webhooks/brain/decision` with header
+`X-Brain-Secret` (platform `docs/INTEGRATION_V7.md`), heartbeat-shaped
+artifacts to `/webhooks/brain/artifact`, and `docs/HANDOVER_V7_DESK.md`
+defines the /v7 page contract: "no new rules or code — only take data",
+missing field ⇒ UNKNOWN, ship a payload contract not a pull request. The
+`BB_AI_WEEKLY_BUDGET_USD` env one-liner must still be run on that box by the
+operator.
 
 ---
 
@@ -319,3 +339,18 @@ git. No live testing — demo lane first, always.
 | Date | Change | Files | Reason | Tests | Result | Rollback |
 |---|---|---|---|---|---|---|
 | 2026-08-18 | Phase 1 audit + this proposal | `docs/V7_DESK_AUDIT_2026-08-18.md` | Directive §48 steps 1–10 | n/a (doc only) | audit complete | `git revert` |
+| 2026-08-18 | **1a** v7 status emitter | `core/v7_status.py`, `tests/test_v7_status.py` | v7 emitted nothing; desk needs stance+gate per signal and a heartbeat | 9 new, suite 54✓ | shipped | revert commit |
+| 2026-08-18 | **1a** wiring (no behavior change) | `bot.py` (+24 lines, guarded hooks) | record verdicts at the /webhook choke point; heartbeat each monitor cycle | suite 54✓, compile✓ | shipped | revert commit |
+| 2026-08-18 | **1a** align push with platform contract | `core/v7_status.py` | platform INTEGRATION_V7.md already defines the wire: /webhooks/brain/decision, X-Brain-Secret, PLATFORM_URL/SECRET; system stamped "v7" (normalize_system trap), Pine system → pine_system | 9✓ | shipped | unset PLATFORM_URL/SECRET (inert) or revert |
+| 2026-08-18 | **1b** symbol registry | `core/symbol_registry.py`, `config/symbols.json` ({}), hoists in `core/sl_engine.py` + `core/ic_markets.py`, `bot.py` overlay, `tests/test_symbol_registry.py` | symbols were code in ~10 dicts across 4 files | 6 new, suite 60✓; end-to-end enable proven (alias→GATE-PRICE) | shipped; {} = byte-identical | delete config/symbols.json |
+| 2026-08-18 | **1c** altcoin candidates | `config/symbols.json` (SOLANA/CARDANO/CHAINLINK, enabled:false), `config/README.md` (enable ceremony), `sniper_executor.py` aliases | SOL/ADA/LINK requested; XRP/LTC already wired; specs must be broker-verified first | suite 60✓; test enforces all entries benched | shipped, zero behavior change | entries stay false / revert |
+| 2026-08-18 | V7 Desk page (dashboard repo) | `brother-brain-v2/dashboard/backend/v7_desk.py`, `main.py` (+guarded 3-line register), `tests/test_v7_desk.py` | desk view over v7's own feed: freshness, per-symbol stance+gate, why-not-trade, edge tables (n<20 PROVISIONAL) | 8 new✓; Chromium render, no JS errors | shipped, display-only | revert commit (register is guarded) |
+
+**Deploy ceremony still owed by the operator** (nothing is live until then):
+v7 box: backup → `git pull` → restart `sniper-bot.service` → verify
+`[V7-STATUS]`/`[SYMBOLS]` lines in logs/bot.log and that
+`learning/v7_status.json` appears. Dashboard box: same for
+`brother-dashboard.service`, then open `/api/v7/desk/page?t=<token>`.
+Optional platform push: set `PLATFORM_URL` + `PLATFORM_SECRET` in v7's .env
+(values per platform INTEGRATION_V7.md; secret = platform
+`BB_BRAIN_WEBHOOK_SECRET`) — leave unset and the mirror stays inert.

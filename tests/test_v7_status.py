@@ -63,6 +63,9 @@ def test_build_decision_executed():
     assert d["entry"] == 4400.5 and d["sl"] == 4390.0  # result SL wins
     assert d["cluster"] == "GOLD|BUY|london|TREND"
     assert d["pine_ver"] == "18.12"
+    # Pine's system name must NOT be sent as "system" — the platform's
+    # normalize_system files anything containing "18" into the v18 lane.
+    assert "system" not in d and d["pine_system"] == "BSv18"
 
 
 def test_build_decision_blocked_keeps_gate_detail():
@@ -131,9 +134,15 @@ def test_entry_points_never_raise(monkeypatch):
 
 
 def test_push_disabled_by_default(monkeypatch):
-    monkeypatch.delenv("V7_MIRROR_ENABLED", raising=False)
+    monkeypatch.delenv("PLATFORM_URL", raising=False)
+    monkeypatch.delenv("PLATFORM_SECRET", raising=False)
     called = []
     monkeypatch.setattr(vs.threading, "Thread",
                         lambda **k: called.append(k) or type("T", (), {"start": lambda s: None})())
-    vs._push({"kind": "x"})
-    assert called == []  # flag off -> no thread, no network
+    vs._push({"kind": "x"}, "/webhooks/brain/decision")
+    assert called == []  # env unset -> no thread, no network
+    # both set -> a post thread is spawned (INTEGRATION_V7.md contract)
+    monkeypatch.setenv("PLATFORM_URL", "https://app.example")
+    monkeypatch.setenv("PLATFORM_SECRET", "s3cret")
+    vs._push({"kind": "x"}, "/webhooks/brain/decision")
+    assert len(called) == 1

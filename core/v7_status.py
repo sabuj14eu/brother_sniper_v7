@@ -15,9 +15,15 @@ HARD RULES (same law as learning/telemetry.py):
   * v7 ships data, the platform displays it. Fields we don't have are absent —
     the consumer renders UNKNOWN, never a manufactured value.
   * Pull surface: learning/v7_status.json (atomic replace, heartbeat + last
-    N decisions). Push surface: optional POST per record, OFF by default
-    (V7_MIRROR_ENABLED=true + V7_MIRROR_URL to enable), one attempt on a
-    daemon thread, failures logged and dropped.
+    N decisions). Push surface: the EXISTING platform contract from the
+    platform repo's docs/INTEGRATION_V7.md — decisions to
+    {PLATFORM_URL}/webhooks/brain/decision, heartbeats to
+    {PLATFORM_URL}/webhooks/brain/artifact, header X-Brain-Secret, one
+    attempt on a daemon thread, failures logged and dropped. OFF until both
+    PLATFORM_URL and PLATFORM_SECRET are set in the environment.
+  * The platform files anything whose "system" contains "18" into the v18
+    lane (normalize_system), so the push stamps system:"v7" and carries
+    Pine's own system name as pine_system.
 """
 from __future__ import annotations
 
@@ -109,7 +115,7 @@ def build_decision(payload: dict, result: dict) -> dict:
         "signal_id": r.get("signal_id") or p.get("signal_id"),
         "symbol": p.get("symbol"),
         "direction": p.get("direction") or p.get("signal") or p.get("action"),
-        "system": p.get("system"),
+        "pine_system": p.get("system"),
         "type": p.get("type"),
         "session": p.get("session"),
         "tf": p.get("tf"),
@@ -125,6 +131,7 @@ def build_decision(payload: dict, result: dict) -> dict:
         "status": status,
         "gate": gate,
         "gate_detail": msg or None,
+        "reason": msg or None,  # the platform's recognized field name
         "executed": status == "ok",
         "order_id": r.get("order_id"),
         "lot": r.get("lot"),
@@ -223,21 +230,22 @@ def _write_status() -> None:
             raise
 
 
-# ── push surface (optional, OFF by default) ──────────────────────────────────
+# ── push surface (the EXISTING contract: platform docs/INTEGRATION_V7.md) ───
 
-def _push(record: dict) -> None:
-    if os.getenv("V7_MIRROR_ENABLED", "").lower() not in ("1", "true", "yes"):
+def _push(record: dict, path: str) -> None:
+    """Fire-and-forget POST to the platform. Inert until PLATFORM_URL and
+    PLATFORM_SECRET are both set (same env names as INTEGRATION_V7.md)."""
+    base = os.getenv("PLATFORM_URL", "").rstrip("/")
+    secret = os.getenv("PLATFORM_SECRET", "")
+    if not base or not secret:
         return
-    url = os.getenv("V7_MIRROR_URL", "")
-    if not url:
-        return
+    body = {**record, "system": "v7"}
 
     def _post():
         try:
             import requests
-            requests.post(url, json=record, timeout=5, headers={
-                "X-V7-Secret": os.getenv("V7_MIRROR_SECRET", ""),
-                "Content-Type": "application/json"})
+            requests.post(base + path, json=body, timeout=5,
+                          headers={"X-Brain-Secret": secret})
         except Exception as e:
             log.warning(f"[V7-STATUS] push dropped (non-fatal): {type(e).__name__}")
 
@@ -255,7 +263,7 @@ def record_decision(payload: dict, result: dict) -> None:
                 _load_existing()
             _decisions.append(rec)
         _write_status()
-        _push(rec)
+        _push(rec, "/webhooks/brain/decision")
     except Exception as e:  # pragma: no cover - defensive
         log.warning(f"[V7-STATUS] record_decision skipped (non-fatal): {e}")
 
@@ -268,6 +276,8 @@ def update_heartbeat(state: dict, guard: dict | None = None, **kw) -> None:
         with _lock:
             _heartbeat = hb
         _write_status()
-        _push(hb)
+        # artifacts endpoint expects kind/generated_at; extra keys pass through
+        _push({**hb, "generated_at": hb.get("ts"),
+               "title": "v7 heartbeat"}, "/webhooks/brain/artifact")
     except Exception as e:  # pragma: no cover - defensive
         log.warning(f"[V7-STATUS] update_heartbeat skipped (non-fatal): {e}")

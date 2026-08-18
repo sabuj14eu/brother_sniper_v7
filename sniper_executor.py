@@ -119,6 +119,47 @@ else:
         log.warning("MT5 initialize() returned True but account_info() is None")
 
 # ── ROUTES ──────────────────────────────────────────────────────────────────
+@app.route("/symbolspec", methods=["GET"])
+def symbolspec_route():
+    """Read-only broker truth for one symbol: decimals, tick size/value, lot
+    bounds, and whether it is actually tradable. Exists because a wrong
+    decimal count collapses two tradable levels into one displayed price —
+    so no coin goes live until these numbers are confirmed against the
+    platform's display config. Never places anything."""
+    sym_in = str(request.args.get("symbol", "") or "").upper()
+    sym = SYMBOL_MAP.get(sym_in, sym_in)
+    try:
+        if not ensure_mt5():
+            return jsonify({"symbol": sym, "ok": False, "reason": "mt5_not_connected"}), 503
+        mt5.symbol_select(sym, True)          # a hidden symbol has no spec until selected
+        info = mt5.symbol_info(sym)
+        if info is None:
+            return jsonify({"symbol": sym, "requested": sym_in, "ok": False,
+                            "reason": "unknown_symbol",
+                            "last_error": str(mt5.last_error())}), 404
+        _MODES = {0: "DISABLED", 1: "LONG_ONLY", 2: "SHORT_ONLY",
+                  3: "CLOSE_ONLY", 4: "FULL"}
+        tk = mt5.symbol_info_tick(sym)
+        return jsonify({
+            "ok": True, "requested": sym_in, "symbol": sym,
+            "digits": info.digits,                    # <- the decimals the platform must match
+            "point": info.point,
+            "tick_size": info.trade_tick_size,
+            "tick_value": info.trade_tick_value,
+            "volume_min": info.volume_min,
+            "volume_max": info.volume_max,
+            "volume_step": info.volume_step,
+            "trade_mode": _MODES.get(getattr(info, "trade_mode", None), "UNKNOWN"),
+            "tradable": _MODES.get(getattr(info, "trade_mode", None)) == "FULL",
+            "visible": bool(getattr(info, "visible", False)),
+            "spread_points": getattr(info, "spread", None),
+            "bid": float(tk.bid) if tk and tk.bid else None,
+            "ask": float(tk.ask) if tk and tk.ask else None,
+        })
+    except Exception as e:
+        return jsonify({"symbol": sym, "ok": False, "reason": type(e).__name__}), 500
+
+
 @app.route("/spread", methods=["GET"])
 def spread_route():
     return jsonify(_tick_spread(request.args.get("symbol", "")))

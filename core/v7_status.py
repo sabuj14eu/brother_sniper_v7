@@ -40,6 +40,11 @@ log = logging.getLogger("sniper.v7status")
 
 _BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 STATUS_FILE = os.path.join(_BASE, "learning", "v7_status.json")
+# Durable append-only journal of every verdict. STATUS_FILE is a rewritten
+# ring of the last 50 for display; THIS is the evidence record — it carries
+# the levels and the timestamp the counterfactual replay needs, which the
+# telemetry reject rows do not (their schema has no entry/sl/tp/ts).
+JOURNAL_FILE = os.path.join(_BASE, "learning", "decisions.jsonl")
 
 MAX_DECISIONS = 50
 SCHEMA_VER = "v7-status-1"
@@ -257,6 +262,18 @@ def _push(record: dict, path: str) -> None:
 
 # ── public entry points (never raise) ────────────────────────────────────────
 
+def _append_journal(rec: dict) -> None:
+    """Append one verdict to the durable evidence journal. Never raises."""
+    try:
+        os.makedirs(os.path.dirname(JOURNAL_FILE), exist_ok=True)
+        line = json.dumps(rec, default=str) + "\n"
+        with _lock:
+            with open(JOURNAL_FILE, "a", encoding="utf-8") as f:
+                f.write(line)
+    except Exception as e:  # pragma: no cover - defensive
+        log.warning(f"[V7-STATUS] journal append skipped (non-fatal): {e}")
+
+
 def record_decision(payload: dict, result: dict) -> None:
     """Call at the /webhook choke point for every finished signal."""
     try:
@@ -265,6 +282,7 @@ def record_decision(payload: dict, result: dict) -> None:
             if not _loaded:
                 _load_existing()
             _decisions.append(rec)
+        _append_journal(rec)
         _write_status()
         _push(rec, "/webhooks/brain/decision")
     except Exception as e:  # pragma: no cover - defensive

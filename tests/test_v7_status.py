@@ -126,6 +126,32 @@ def test_record_and_reload(tmp_path, monkeypatch):
     assert gates == ["GATE-DEDUP", "GATE-PAUSED"]
 
 
+def test_every_verdict_lands_in_the_durable_journal(tmp_path, monkeypatch):
+    """The status file is a 50-ring rewritten each time; the journal is the
+    evidence record and must keep every verdict, with the levels and the
+    timestamp the counterfactual replay needs."""
+    monkeypatch.setattr(vs, "STATUS_FILE", str(tmp_path / "v7_status.json"))
+    monkeypatch.setattr(vs, "JOURNAL_FILE", str(tmp_path / "decisions.jsonl"))
+    vs._decisions.clear()
+    for i in range(3):
+        vs.record_decision({**_PAYLOAD, "signal_id": f"SS-{i}"},
+                           {"status": "blocked", "msg": "News in 22min"})
+    lines = (tmp_path / "decisions.jsonl").read_text().strip().split("\n")
+    assert len(lines) == 3
+    row = json.loads(lines[0])
+    assert row["gate"] == "GATE-NEWS" and row["entry"] == 4400.5
+    assert row["sl"] == 4392.1 and row["tp"] == 4412.0 and row["ts"]
+    assert row["direction"] == "BUY"
+
+
+def test_journal_failure_never_breaks_recording(tmp_path, monkeypatch):
+    monkeypatch.setattr(vs, "STATUS_FILE", str(tmp_path / "v7_status.json"))
+    monkeypatch.setattr(vs, "JOURNAL_FILE", "/nonexistent-dir-xyz/j.jsonl")
+    vs._decisions.clear()
+    vs.record_decision(_PAYLOAD, {"status": "ok"})
+    assert (tmp_path / "v7_status.json").exists()   # display path unaffected
+
+
 def test_entry_points_never_raise(monkeypatch):
     # unwritable path: both entry points must swallow the failure
     monkeypatch.setattr(vs, "STATUS_FILE", "/nonexistent-dir-xyz/no/v7.json")

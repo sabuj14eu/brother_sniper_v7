@@ -13,11 +13,15 @@ looks identical to a working one until an order is rejected.
 from __future__ import annotations
 
 import json
+import os
 import sys
 import urllib.parse
 import urllib.request
 
-BRIDGE = "http://127.0.0.1:5001"
+# The bridge runs on the WINDOWS box, so 127.0.0.1 only works when the probe
+# runs there. Default to the same address session_caller/push_bias already use
+# from the Contabo box; override with V7_BRIDGE_URL for a local run.
+BRIDGE = os.getenv("V7_BRIDGE_URL", "http://164.68.126.105:5001")
 # Bridge-side names (SYMBOL_MAP resolves aliases); staging candidates.
 DEFAULT = ["RIPPLE", "LITECOIN", "SOLUSD", "ADAUSD", "LINKUSD",
            "BITCOIN", "ETHEREUM"]          # last two = known-good controls

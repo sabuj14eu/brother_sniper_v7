@@ -21,8 +21,9 @@ with open(SRC_PATH, encoding="utf-8") as f:
     SRC = f.read()
 TREE = ast.parse(SRC)
 
-# Market-data reads that must be gated; live-path reads that must NOT be.
-GATED = ("candles", "spread_route", "symbolspec_route")
+# Unconditionally gated (no live caller). /candles is gated only on live=1 —
+# see test_candles_gate_is_live_only for why that is the correct boundary.
+GATED = ("spread_route", "symbolspec_route")
 UNGATED = ("health", "positions")
 
 
@@ -93,6 +94,37 @@ def test_trading_path_routes_are_not_gated():
     public market data — a bad trade, and an outage waiting to happen."""
     for name in UNGATED:
         assert not _calls_guard(_fn(name)), f"{name} must stay open"
+
+
+def test_candles_gate_is_live_only():
+    """The key must guard the FORMING-bar path and nothing else.
+
+    Closed bars are read by the trading bot itself (bot.py fetch_atr), by
+    analyst_eye and by the status dashboard — none of which send a key. A
+    guard that ignored `live` would starve live ATR silently, because
+    fetch_atr fails safe to None: no error, no alert, just slightly different
+    trading. This asserts the condition still mentions `live`."""
+    node = _fn("candles")
+    for n in ast.walk(node):
+        if not isinstance(n, ast.If):
+            continue
+        if any(isinstance(c, ast.Call) and getattr(c.func, "id", "") == "_key_ok"
+               for c in ast.walk(n.test)):
+            names = {x.id for x in ast.walk(n.test) if isinstance(x, ast.Name)}
+            assert "live" in names, "candles gate must be conditional on live=1"
+            return
+    raise AssertionError("candles has no _key_ok gate at all")
+
+
+def test_trading_bot_never_asks_for_the_forming_bar():
+    """If bot.py ever requests live=1 it lands on the authenticated path and
+    would need a key — this fires first so that is a decision, not an outage."""
+    with open(os.path.join(os.path.dirname(SRC_PATH), "bot.py"),
+              encoding="utf-8") as f:
+        bot = f.read()
+    fetch = bot[bot.index("def fetch_atr("):]
+    fetch = fetch[:fetch.index("\ndef ")]
+    assert "live" not in fetch, "bot.py fetch_atr now uses the keyed path"
 
 
 def test_guard_runs_before_any_mt5_work():

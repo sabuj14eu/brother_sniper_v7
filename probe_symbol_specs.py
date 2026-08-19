@@ -30,7 +30,11 @@ DEFAULT = ["RIPPLE", "LITECOIN", "SOLUSD", "ADAUSD", "LINKUSD",
 def probe(sym):
     q = urllib.parse.urlencode({"symbol": sym})
     try:
-        with urllib.request.urlopen(f"{BRIDGE}/symbolspec?{q}", timeout=10) as r:
+        _rq = urllib.request.Request(f"{BRIDGE}/symbolspec?{q}")
+        _bk = os.getenv("BRIDGE_KEY", "").strip()
+        if _bk:                       # /symbolspec is key-gated when set
+            _rq.add_header("X-Bridge-Key", _bk)
+        with urllib.request.urlopen(_rq, timeout=10) as r:
             return json.loads(r.read().decode("utf-8"))
     except urllib.error.HTTPError as e:
         try:

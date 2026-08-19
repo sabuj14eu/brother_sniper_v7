@@ -436,8 +436,6 @@ def close():
 @app.route("/candles", methods=["GET"])
 def candles():
     try:
-        if not _key_ok():
-            return _denied()
         if not ensure_mt5():
             return jsonify({"status":"error","msg":"mt5 not connected"}), 503
         raw_sym = (request.args.get("symbol") or "").upper()
@@ -458,6 +456,17 @@ def candles():
         # flagged in the payload and on the row, never silently mixed in, so
         # no analytics caller can consume it by accident.
         live = str(request.args.get("live") or "").lower() in ("1", "true", "yes")
+        # The KEY guards the LIVE path only, and that is not a compromise —
+        # it is where the exposure actually is. Closed bars have been served
+        # openly on this port since day one and are read by the trading bot
+        # itself (bot.py fetch_atr, ATR when Pine omits it), by analyst_eye and
+        # by the status dashboard, none of which carry a key. Gating them would
+        # have put a credential in front of a live trading dependency to
+        # protect public market data — silently, since fetch_atr fails safe to
+        # None. The forming bar is the new capability, the platform proxy is
+        # its only caller, and it is fully authenticated.
+        if live and not _key_ok():
+            return _denied()
         rates = mt5.copy_rates_from_pos(symbol, tf, 0 if live else 1, n)
         if rates is None or len(rates) == 0:
             return jsonify({"status":"error","msg":f"no candles for {symbol}",

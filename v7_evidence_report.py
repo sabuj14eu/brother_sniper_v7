@@ -32,7 +32,6 @@ SCHEMA = "v7-evidence-1"
 def build(cf_rows=None, unified=None, mae_rows=None) -> dict:
     import gate_effectiveness as ge
     import mae_recompute as mr
-    import setup_edge as se
     import v7_counterfactual as cf
 
     cf_rows = ge.load_cf() if cf_rows is None else cf_rows
@@ -57,8 +56,10 @@ def build(cf_rows=None, unified=None, mae_rows=None) -> dict:
         "by_grade": rep["by_grade"],
         "by_strategy": rep["by_strategy"],
         # Combination cuts (symbol x side x session ...). Separate key so a
-        # page that only knows the 1-D views keeps working unchanged.
-        "setup_edge": se.setup_edge(unified),
+        # page that only knows the 1-D views keeps working unchanged, and
+        # UNAVAILABLE rather than fatal if the module is absent — one optional
+        # section must never cost the desk its whole evidence file.
+        "setup_edge": _setup_edge(unified),
         "excursions": {"understatement": mr.understatement(mae_rows),
                        "headroom": mr.stop_headroom(mae_rows)},
         "min_n": rep["min_n"], "train_ratio": rep["train_ratio"],
@@ -67,6 +68,19 @@ def build(cf_rows=None, unified=None, mae_rows=None) -> dict:
                  "verdicts read the VALIDATE half of a 70/30 time split. "
                  "Nothing here changes a rule; it is evidence for a human."),
     }
+
+
+def _setup_edge(unified) -> dict:
+    """The combination cuts, or an honest UNAVAILABLE block. setup_edge.py is
+    copied onto the box by hand (it lives on a different branch), so a missing
+    file is a realistic Tuesday — and it must cost this section only, never
+    the whole report."""
+    try:
+        import setup_edge as se
+        return se.setup_edge(unified)
+    except Exception as e:
+        return {"state": "UNAVAILABLE", "families": [],
+                "reason": f"{type(e).__name__}: {e}"}
 
 
 def _read_jsonl(path: str) -> list:

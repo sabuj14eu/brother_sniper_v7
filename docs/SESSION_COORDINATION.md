@@ -33,6 +33,34 @@ file over a fixed one.
    and TradingView alerts freeze Pine at creation. Verify what RUNS from its
    own mouth (journal `pine_ver`, service endpoints), never from the repo.
 
+## ⚠ FORKED CONTRACT — two v7 emitters exist, only one is deployed (08-19)
+
+Found while chasing one trade the platform never received
+(`SS-BUY-20260819104500`, ETHEREUM, opened 13:00 and closed 14:43 with the
+journal proving both). It is not a dropped post. There are **two independent
+v7 → platform emitters, and they disagree on both the endpoint and the id**:
+
+| | endpoint | signal_id | wired into deployed bot.py? |
+|---|---|---|---|
+| `core/v7_status.record_decision` (trade-desk) | `/webhooks/brain/decision` | RAW `SS-BUY-...` | **YES — the only one running** |
+| `learning/platform_mirror.mirror_v7*` (bot-side) | `/webhooks/brain/signal` | `v7-SS-BUY-...` | no (calls exist only on the bot branch) |
+
+Consequences, all of which we have now seen:
+- Live verdicts reach `/decision` under a bare id; the `signals` table's `v7-`
+  rows came from the BACKFILL. A query for `v7-<id>` therefore "proves" a live
+  trade is missing when it may simply be under the other namespace — that is
+  exactly what the two "never arrived" ids looked like.
+- Whichever emitter a box happens to run decides what the desk can show.
+
+**Do not fix this by adding the second emitter.** Two writers of one desk is
+how a page ends up showing a trade twice, or twice with different statuses.
+At convergence pick ONE emitter and ONE id namespace (recommendation: keep
+`v7-<pine_signal_id>` everywhere, since `pine_signal_id` is already the agreed
+join key between both arms) and delete the loser. Until then, any query about
+"did the platform get X" must search BOTH namespaces:
+
+    SELECT signal_id, system, status FROM signals WHERE signal_id LIKE '%<id>%';
+
 ## Shared contracts already agreed (do not fork these)
 - Platform mirror: `learning/platform_mirror.py` (v7) / `brain/src/platform_mirror.py`
   — `pine_signal_id` join key, `rejected_by` structured, spread-at-decision,

@@ -57,10 +57,20 @@ def probe(sym):
         with urllib.request.urlopen(_rq, timeout=10) as r:
             return json.loads(r.read().decode("utf-8"))
     except urllib.error.HTTPError as e:
+        # An error body may carry NO `requested` field — the bridge's 401 is
+        # {"status":"error","msg":"bridge key required"} — and returning it raw
+        # printed a row with a blank symbol and the default reason "NOT FOUND".
+        # A locked-out probe then reads exactly like "the broker does not list
+        # this symbol", which is the wrong answer to hand a staging decision.
+        # The HTTP status always wins here.
+        body = {}
         try:
-            return json.loads(e.read().decode("utf-8"))
+            body = json.loads(e.read().decode("utf-8")) or {}
         except Exception:
-            return {"requested": sym, "ok": False, "reason": f"HTTP {e.code}"}
+            pass
+        detail = str(body.get("msg") or body.get("reason") or "").strip()
+        return {**body, "requested": sym, "ok": False,
+                "reason": f"HTTP {e.code}" + (f" ({detail})" if detail else "")}
     except Exception as e:
         return {"requested": sym, "ok": False, "reason": type(e).__name__}
 

@@ -65,6 +65,11 @@ def main() -> int:
     print("-- 2) how many are not in the table at all?")
     print(f"SELECT {len(ids)} - count(DISTINCT signal_id) AS missing_entirely "
           f"FROM signals WHERE signal_id IN ({lst});")
+    print("-- 2b) NAME them — these never reached the platform under any id,")
+    print("--     which makes them a sender-side question, not an ingest one.")
+    vals = ",".join("(" + sql_literal(s) + ")" for s in ids)
+    print(f"SELECT sid AS never_arrived FROM (VALUES {vals}) AS t(sid) "
+          "EXCEPT SELECT signal_id FROM signals ORDER BY 1;")
     print("-- 3) a few that are stored but NOT closed — the ones to explain")
     print(f"SELECT signal_id, status, symbol FROM signals WHERE signal_id IN "
           f"({lst}) AND status <> 'closed' ORDER BY signal_id LIMIT 15;")

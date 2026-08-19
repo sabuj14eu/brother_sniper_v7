@@ -95,18 +95,17 @@ def main():
             break
         # An ORPHAN close — a close row with no matching open row — carries no
         # symbol, and neither does the close record itself (trade_memory writes
-        # ids, prices and PnL only). Sending it produces symbol:null, which the
-        # platform rightly declines: that is how 2 of these silently "never
-        # arrived". Skip it and SAY SO. The symbol is not invented from the
-        # ticket, and never guessed. (Recoverable in principle for ADOPTED_<tk>
-        # rows, whose ticket is in the id, by asking the broker — worth doing
-        # only if this ever stops being a handful of rows.)
-        if not o.get("symbol"):
+        # ids, prices and PnL only). It is still a REAL closed trade with real
+        # PnL, so it is sent with the gap declared rather than dropped: the
+        # platform stores it with an empty symbol and a symbol_missing event
+        # (their v4.20), which keeps the money in the totals while keeping the
+        # row out of every per-symbol table. The symbol is never invented —
+        # not from the ticket embedded in ADOPTED_<ticket>, not from anywhere.
+        # (Earlier this sent symbol:null unflagged, which their str(None) turned
+        # into a phantom "NONE" market. Declaring the gap is what fixes that.)
+        orphan = not o.get("symbol")
+        if orphan:
             unsendable += 1
-            print(f"[skip] {sid} — orphan close, no open row and therefore no "
-                  f"symbol; not sent (never invent one)")
-            open(CURSOR, "w").write(str(start + i + 1))
-            continue
         net = float(c.get("net_profit") or 0)
         body = build_v7_payload(
             {"signal_id": sid, "symbol": o.get("symbol"), "direction": o.get("direction"),
@@ -121,6 +120,10 @@ def main():
                      "closed_at": c.get("timestamp_close")})
         body["backfill"] = True
         body["ts"] = c.get("timestamp_close")
+        if orphan:
+            # declared, never inferred: no open row means no symbol to give
+            body["symbol_missing"] = True
+            body["symbol"] = None
         if args.dry_run:
             if sent < 3:
                 print(f"[dry] {body['signal_id']} {body['symbol']} net={net:+.2f} "
@@ -138,7 +141,7 @@ def main():
             time.sleep(args.sleep)
 
     print(f"[closes] sent {sent}"
-          + (f" · skipped {unsendable} orphan (no symbol)" if unsendable else "")
+          + (f" · {unsendable} orphan (sent with symbol_missing)" if unsendable else "")
           + (" (DRY RUN — nothing posted)" if args.dry_run else ""))
 
 

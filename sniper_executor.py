@@ -421,8 +421,14 @@ def candles():
         tf = tf_map.get(tf_str, mt5.TIMEFRAME_M15)
         if not mt5.symbol_select(symbol, True):
             return jsonify({"status":"error","msg":f"symbol select failed: {symbol}"}), 400
-        # [AUDIT BOT-P0-3] start=1: CLOSED bars only — the live bar repaints
-        rates = mt5.copy_rates_from_pos(symbol, tf, 1, n)
+        # [AUDIT BOT-P0-3] start=1: CLOSED bars only — the live bar repaints,
+        # and a repainting bar in an analytics window is a fabricated result.
+        # ?live=1 opts INTO the forming bar for one purpose only: drawing a
+        # live chart, where a candle that is still moving is the point. It is
+        # flagged in the payload and on the row, never silently mixed in, so
+        # no analytics caller can consume it by accident.
+        live = str(request.args.get("live") or "").lower() in ("1", "true", "yes")
+        rates = mt5.copy_rates_from_pos(symbol, tf, 0 if live else 1, n)
         if rates is None or len(rates) == 0:
             return jsonify({"status":"error","msg":f"no candles for {symbol}",
                             "last_error":str(mt5.last_error())}), 400
@@ -430,9 +436,12 @@ def candles():
         rows = [{"time":int(r["time"]) - _off, "open":float(r["open"]), "high":float(r["high"]),
                  "low":float(r["low"]), "close":float(r["close"]),
                  "volume":int(r["tick_volume"])} for r in rates]
+        if live and rows:
+            rows[-1]["forming"] = True      # still moving; will repaint
         _sp = _tick_spread(symbol)
         return jsonify({"status":"ok","symbol":symbol,"tf":tf_str,"count":len(rows),"rows":rows,
-                        "closed_only":True,"utc_normalized":True,
+                        "closed_only":not live,"utc_normalized":True,
+                        "forming_last":bool(live and rows),
                         "spread":_sp.get("spread"),"spread_points":_sp.get("spread_points"),
                         "bid":_sp.get("bid"),"ask":_sp.get("ask")})
     except Exception as e:

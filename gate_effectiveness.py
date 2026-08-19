@@ -147,6 +147,25 @@ def kept_lane(unified_rows: list[dict]) -> dict:
     return bucket_stats(rs)
 
 
+# Cluster labels. Thresholds are DISPLAY vocabulary, not trading rules: they
+# decide what a page calls a bucket, never what the bot does. Both require a
+# real sample first — an unproven cluster is never called strong or weak.
+STRONG_PF = 1.30
+WEAK_PF = 0.90
+
+
+def cluster_verdict(stats: dict) -> str:
+    """STRONG / WEAK / NEUTRAL / UNPROVEN for one bucket of realized trades."""
+    if stats.get("n", 0) < MIN_N or stats.get("pf") is None:
+        return "UNPROVEN"
+    pf, e = stats["pf"], stats.get("expectancy_r")
+    if pf >= STRONG_PF and (e or 0) > 0:
+        return "STRONG"
+    if pf <= WEAK_PF or (e is not None and e < 0):
+        return "WEAK"
+    return "NEUTRAL"
+
+
 def by_dimension(unified_rows: list[dict], key: str) -> list[dict]:
     """Realized edge grouped by any stored field (session, symbol, grade,
     regime, strategy_id …) — the asset x setup matrix, with PF."""
@@ -161,8 +180,11 @@ def by_dimension(unified_rows: list[dict], key: str) -> list[dict]:
         except (KeyError, TypeError, ValueError):
             continue
         buckets.setdefault(str(row.get(key) or "—"), []).append(net / (bal * rp))
-    return sorted(({"key": k, **bucket_stats(v)} for k, v in buckets.items()),
-                  key=lambda r: -r["n"])
+    rows = []
+    for k, v in buckets.items():
+        stats = bucket_stats(v)
+        rows.append({"key": k, **stats, "verdict": cluster_verdict(stats)})
+    return sorted(rows, key=lambda r: -r["n"])
 
 
 # ── io ───────────────────────────────────────────────────────────────────────

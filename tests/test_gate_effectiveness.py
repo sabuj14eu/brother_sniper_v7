@@ -168,3 +168,39 @@ def test_empty_inputs_produce_an_honest_empty_report():
     rep = ge.report([], [])
     assert rep["gates"] == [] and rep["kept_lane"]["n"] == 0
     assert rep["kept_lane"]["expectancy_r"] is None
+
+
+# ── cluster labels (the STRONG / WEAK vocabulary the desk shows) ─────────────
+
+def test_a_cluster_is_never_labelled_before_it_has_a_sample():
+    """20 straight winners is a sample; 19 is luck, whatever the PF."""
+    assert ge.cluster_verdict(ge.bucket_stats([2.0, -1.0] * 9)) == "UNPROVEN"
+    assert ge.cluster_verdict(ge.bucket_stats([2.0, -1.0] * 10)) != "UNPROVEN"
+
+
+def test_strong_needs_both_a_good_pf_and_a_positive_expectancy():
+    strong = ge.bucket_stats([1.0] * 14 + [-1.0] * 6)      # PF 2.33, +0.4R
+    assert ge.cluster_verdict(strong) == "STRONG"
+
+
+def test_a_losing_cluster_reads_weak():
+    weak = ge.bucket_stats([1.0] * 6 + [-1.0] * 14)        # PF 0.43, -0.4R
+    assert ge.cluster_verdict(weak) == "WEAK"
+
+
+def test_a_break_even_cluster_is_neutral_not_flattered():
+    neutral = ge.bucket_stats([1.1] * 10 + [-1.0] * 10)    # PF 1.10, +0.05R
+    assert ge.cluster_verdict(neutral) == "NEUTRAL"
+
+
+def test_a_cluster_with_no_losses_yet_is_unproven_not_infinite():
+    assert ge.cluster_verdict(ge.bucket_stats([1.0] * 25)) == "UNPROVEN"
+
+
+def test_by_dimension_attaches_the_verdict_to_every_bucket():
+    rows = [_trade(30.0, session="london") for _ in range(14)] + \
+           [_trade(-30.0, session="london") for _ in range(6)] + \
+           [_trade(-30.0, session="asian")]
+    out = {b["key"]: b for b in ge.by_dimension(rows, "session")}
+    assert out["london"]["verdict"] == "STRONG"
+    assert out["asian"]["verdict"] == "UNPROVEN"     # n=1

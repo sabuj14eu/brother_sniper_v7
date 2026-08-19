@@ -189,6 +189,37 @@ Cron (nightly, beside `nightly_edge.py`):
 Still true after all five: nothing dispatches, nothing changes a gate,
 threshold, level or weight, and every number carries its sample size.
 
+## FIRST MEASURED BASELINE — 2026-08-19 (pre-fix era)
+
+The first honest figure the system has produced about itself, from the
+194 joined-and-priceable outcomes in the journal:
+
+    KEPT LANE   n=194 · WR 47.9% · PF 0.86 · expectancy -0.047R
+
+Read it as it is: **slightly negative, and no longer PROVISIONAL** (n=194
+is nearly twice the ~100-trade threshold). PF 0.86 means the losses
+outweigh the wins by roughly 14%. This is the baseline every later change
+is measured against — not a verdict on any single rule, and not licence to
+change one: which organ is responsible needs the per-gate and per-cluster
+breakdowns, and those are still thin.
+
+What is NOT yet measurable, and why:
+  * **Excursions: 0 of 194 recomputed.** Every close predates the bridge's
+    5000-bar M1 window (~3.5 days). Not recoverable — M1 history that far
+    back is simply gone. The nightly cron captures closes from now on, so
+    the stop/TP question is answerable in weeks, not today.
+  * **Gate effectiveness: 2 stored verdicts, both UNKNOWN.** The decisions
+    journal began at deploy, so the counterfactual lane has almost nothing
+    yet. Gate judgment waits for data, exactly as the Evidence Law demands.
+  * **Cross-repo read:** the dashboard service runs under systemd hardening
+    (ProtectHome / ProtectSystem=strict per deploy/brother-brain.service).
+    It was provisioned to read its own repo only; the V7 Desk reads
+    /home/shyam/brother_sniper_v7/learning/, which the sandbox never
+    whitelisted — so the file reads fine as the shyam user and "does not
+    exist" to the service. That fingerprint (everything brain-side works,
+    only the cross-repo path fails) is the whole bug. Fix is a unit
+    override adding that path, not a code change.
+
 ## BUILD ORDER (each its own commit, each read-only)
 
 1. `v7_counterfactual.py` replay engine + reject-lane outcomes (§6) — the

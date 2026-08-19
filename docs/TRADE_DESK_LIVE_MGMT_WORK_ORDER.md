@@ -174,7 +174,35 @@ status, count(*) FROM signals WHERE system='v7'` returns approved 48 ·
 closed 175 · rejected 39. The earlier ingestion suspicion is withdrawn:
 they stored them.
 
-**Open item — a 27-row gap (202 sent, 175 stored), bot-side to explain.**
+### SETTLED 08-19 — and it is a LIVE bug, not a backfill one
+
+`platform_gap_sql.py` grouped all 204 journal-closed ids by the status the
+platform actually holds:
+
+    closed 175 · approved 25 · rejected 2 · missing entirely 2
+
+The 25 "approved" rows are all recent (08-06 → 08-18) — exactly the trades
+that WERE mirrored live when they opened. The 175 "closed" are older ones the
+backfill inserted fresh, having no prior row. That is the whole story:
+
+**the platform's signal handler does not apply a status change to a
+signal_id it already holds.** It answers 2xx and keeps the old row.
+
+The consequence is not historical. **Every trade v7 opens and later closes
+from now on will sit on the desk as "approved" forever** — the live close
+post is being dropped the same way the backfill's was. The desk cannot show a
+closing trade until this is fixed platform-side (upsert the status, or apply a
+transition approved→closed on matching signal_id).
+
+Once fixed, re-sending history is one command: delete
+`.backfill_closes_cursor` on the v7 box and re-run `backfill_v7_closes.py` —
+it is idempotent by design.
+
+Two ids came back `rejected` despite having a close in v7's journal, and 2 are
+absent entirely (the orphan closes carry a null symbol). Small, and worth a
+look after the status bug — not before.
+
+**Superseded hypothesis (kept so the reasoning is auditable):**
 Not duplicates: `load_pairs()` keys closes by signal_id in a dict, so all 202
 were unique ids. The leading candidate is in that same function — a close row
 whose OPEN row is missing still produces a pair (`opens.get(sid, {})`), so its

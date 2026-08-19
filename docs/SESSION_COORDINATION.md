@@ -61,6 +61,28 @@ join key between both arms) and delete the loser. Until then, any query about
 
     SELECT signal_id, system, status FROM signals WHERE signal_id LIKE '%<id>%';
 
+## Where things run (two boxes, and the mistakes that follow)
+
+**`probe_symbol_specs.py` runs from CONTABO, not Windows.** It is an HTTP
+client: it asks the bridge at `164.68.126.105:5001` and never imports MT5.
+A "file not found" from Contabo means the single-file checkout was skipped
+(this box lives on another branch — see the rules above), NOT that the probe
+belongs on the Windows box. Running it there would need python, the repo and
+the venv on a box that has none of them. It needs `BRIDGE_KEY` in `.env` now
+that `/symbolspec` is key-gated, or every symbol reports `HTTP 401`, which the
+output would otherwise render as "the broker does not list it".
+
+    git checkout origin/claude/brain-platform-mirror-fcacwl -- probe_symbol_specs.py
+    python3 probe_symbol_specs.py UST10Y_U6 USDX DXY_U6
+
+**⚠ The candle reporter is UNVERSIONED.** It runs as a Windows NSSM service
+and exists in no repository on either branch — it cannot be reviewed,
+diffed, restored after a disk loss, or safely edited by anyone who cannot
+see it. Anything that needs a symbol added to the platform's candle feed is
+therefore blocked on reading a file that only one machine has. It should be
+committed here at the next opportunity; until then, treat every change to it
+as a deploy with no rollback.
+
 ## Shared contracts already agreed (do not fork these)
 - Platform mirror: `learning/platform_mirror.py` (v7) / `brain/src/platform_mirror.py`
   — `pine_signal_id` join key, `rejected_by` structured, spread-at-decision,

@@ -1126,9 +1126,12 @@ def handle_signal(payload: dict, raw_body: bytes = b"") -> dict:
             import time as _t, requests as _rrq
             _t.sleep(2.0)
             _rbase=os.getenv("EXECUTOR_URL","").replace("/execute","")
-            _rcomment=f"BS_{sid}"
+            # [FIX 2026-08-18] the bridge writes BS_+md5(sid)[:8], not BS_<sid>,
+            # so this match was never true and the timeout-recovery path could
+            # never adopt its own filled order. Match both forms.
+            from core.order_comment import matches as _cmt_match
             _rpos=_rrq.get(_rbase+"/positions",timeout=6).json().get("positions",[])
-            _matches=[q for q in _rpos if q.get("comment")==_rcomment]
+            _matches=[q for q in _rpos if _cmt_match(q.get("comment"), sid)]
             if _matches:
                 _ac2=asset_class(symbol)
                 _tracked=list(all_open_trades())

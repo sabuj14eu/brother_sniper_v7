@@ -109,10 +109,15 @@ SYMBOL_MAP.update({
     "UST10Y": os.getenv("MT5_US10Y_SYMBOL", "UST10Y_U6"),
     "US30Y":  os.getenv("MT5_US30Y_SYMBOL", "UST30Y_U6"),
     "UST30Y": os.getenv("MT5_US30Y_SYMBOL", "UST30Y_U6"),
-    # DXY has been mapped to USDX here while the brain box reads DXY_U6 — two
-    # boxes, two terminals, possibly two different listings. Overridable so
-    # whichever one this terminal actually serves can be set without a deploy.
-    "DXY":    os.getenv("MT5_DXY_SYMBOL", "USDX"),
+    # [08-19 PROBED] DXY was mapped to USDX, which this terminal DOES NOT LIST
+    # ("Terminal: Not found"). Every DXY read through this bridge has been
+    # failing since the map was written — invisibly, because a missing symbol
+    # and a quiet symbol look identical from the caller's side. DXY_U6 is
+    # present and printing (bid 98.67 at the probe), and it is what the brain
+    # box already reads, so both terminals now agree on one instrument.
+    # Dated, like the others: it rolls, hence the override.
+    "DXY":    os.getenv("MT5_DXY_SYMBOL", "DXY_U6"),
+    "USDX":   os.getenv("MT5_DXY_SYMBOL", "DXY_U6"),
 })
 
 # ── MT5 CONNECTION MANAGEMENT ───────────────────────────────────────────────

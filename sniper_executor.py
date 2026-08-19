@@ -90,6 +90,31 @@ SYMBOL_MAP = {
     "DXY":"USDX",
 }
 
+# ── MACRO MEASUREMENT LEGS (read-only; DATED CONTRACTS THAT ROLL) ────────────
+# Probed 08-19 on this terminal: UST10Y_U6 "US T-Note 10 YR-September 26 CFD"
+# and UST30Y_U6 "US T-Bond 30 YR-September 26 CFD".
+#
+# These exist so the event-reaction recorder can measure whether a macro shock
+# TRANSMITTED — DXY + yields -> metals/indices — instead of only asking whether
+# the dollar agreed. They are a measurement leg, never a signal: nothing here
+# gives US10Y a vote in any trading decision.
+#
+# `_U6` is SEPTEMBER 2026. It WILL roll, the old symbol will stop printing new
+# bars, and nothing will raise: a dead dated contract looks exactly like a
+# quiet market. Hence env overrides — a roll is a config change and a restart,
+# not a code deploy. The platform's Live Bridge page shows newest-bar age,
+# which is the detector: if the yield leg's age stops moving, it has rolled.
+SYMBOL_MAP.update({
+    "US10Y":  os.getenv("MT5_US10Y_SYMBOL", "UST10Y_U6"),
+    "UST10Y": os.getenv("MT5_US10Y_SYMBOL", "UST10Y_U6"),
+    "US30Y":  os.getenv("MT5_US30Y_SYMBOL", "UST30Y_U6"),
+    "UST30Y": os.getenv("MT5_US30Y_SYMBOL", "UST30Y_U6"),
+    # DXY has been mapped to USDX here while the brain box reads DXY_U6 — two
+    # boxes, two terminals, possibly two different listings. Overridable so
+    # whichever one this terminal actually serves can be set without a deploy.
+    "DXY":    os.getenv("MT5_DXY_SYMBOL", "USDX"),
+})
+
 # ── MT5 CONNECTION MANAGEMENT ───────────────────────────────────────────────
 _off_cache = {"t": 0.0, "off": 0}
 def _broker_utc_offset():

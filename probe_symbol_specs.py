@@ -27,11 +27,31 @@ DEFAULT = ["RIPPLE", "LITECOIN", "SOLUSD", "ADAUSD", "LINKUSD",
            "BITCOIN", "ETHEREUM"]          # last two = known-good controls
 
 
+def _bridge_key() -> str:
+    """BRIDGE_KEY from the environment, else from .env. The probe runs by hand
+    from the Contabo box, which loads no service environment — without the
+    fallback a key-gated bridge answers 401 and the probe reports every symbol
+    as missing, which reads exactly like "the broker doesn't have it"."""
+    v = os.getenv("BRIDGE_KEY", "").strip()
+    if v:
+        return v
+    try:
+        with open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                               ".env"), encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if line.startswith("BRIDGE_KEY="):
+                    return line.split("=", 1)[1].strip()
+    except Exception:
+        pass
+    return ""
+
+
 def probe(sym):
     q = urllib.parse.urlencode({"symbol": sym})
     try:
         _rq = urllib.request.Request(f"{BRIDGE}/symbolspec?{q}")
-        _bk = os.getenv("BRIDGE_KEY", "").strip()
+        _bk = _bridge_key()
         if _bk:                       # /symbolspec is key-gated when set
             _rq.add_header("X-Bridge-Key", _bk)
         with urllib.request.urlopen(_rq, timeout=10) as r:

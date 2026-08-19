@@ -164,13 +164,26 @@ one, judged on n>=20 with a validate split, one organ at a time.
 - No V18 changes. This project reads feeds; it touches neither brain,
   council, Pine, nor the executors' order paths.
 
-## 9. Correction still outstanding for the platform
+## 9. BOT-P0-1 — CLOSED and confirmed on both sides
 
-**BOT-P0-1 is CLOSED bot-side.** The v7 close backfill ran 08-19: 202 closed
-trades posted to `/webhooks/brain/signal` (system BSv7, status `closed`,
-`backfill:true`, ids `v7-<signal_id>`), every post answered 2xx — the sender
-halts and holds its cursor on any non-2xx, and the cursor stands at 202. The
-brain journal's 147 fillable outcome rows are filled. If the V7 Desk still
-renders "no closed trades", the gap is platform-side ingestion of
-`status="closed"` posts (accepted but not stored), not missing bot data.
-Re-sending is one deleted cursor file away once their handler stores them.
+The v7 close backfill ran 08-19: 202 closed trades posted to
+`/webhooks/brain/signal` (system BSv7, status `closed`, `backfill:true`, ids
+`v7-<signal_id>`), every post answered 2xx. The brain journal's 147 fillable
+outcome rows are filled. **The platform DB confirms receipt** — `SELECT
+status, count(*) FROM signals WHERE system='v7'` returns approved 48 ·
+closed 175 · rejected 39. The earlier ingestion suspicion is withdrawn:
+they stored them.
+
+**Open item — a 27-row gap (202 sent, 175 stored), bot-side to explain.**
+Not duplicates: `load_pairs()` keys closes by signal_id in a dict, so all 202
+were unique ids. The leading candidate is in that same function — a close row
+whose OPEN row is missing still produces a pair (`opens.get(sid, {})`), so its
+payload carries `symbol: null`, `direction: null`, `entry: null`. A platform
+that declines rows with no symbol would drop exactly those. Count them with:
+
+    python3 -c "import json;R=[json.loads(l) for l in open('learning/trades.jsonl') if l.strip().startswith('{')];C={r['signal_id'] for r in R if r.get('signal_id') and (r.get('_type')=='close' or r.get('net_profit') is not None)};O={r['signal_id'] for r in R if r.get('signal_id') and not (r.get('_type')=='close' or r.get('net_profit') is not None)};print('closes',len(C),'orphan closes (no open row)',len(C-O))"
+
+If that prints 27 orphans, the mystery is solved and the fix is a decision,
+not a bug hunt: either skip orphan closes (an outcome with no entry teaches
+the desk nothing) or send them with an explicit `partial:true` marker. Do NOT
+paper over it by inventing a symbol.

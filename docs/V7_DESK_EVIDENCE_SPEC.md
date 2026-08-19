@@ -171,6 +171,24 @@ is not already in the tables, never a level, never an approval.
 
 ---
 
+## BUILT 2026-08-19 — steps 1-5 shipped
+
+| Step | Ships as | Notes / corrections the code forced |
+|---|---|---|
+| 1 | `learning/decisions.jsonl` (append in `core/v7_status.py`) + `v7_counterfactual.py` | **Spec §3 was wrong**: telemetry reject rows carry no entry/sl/tp and no timestamp, so they cannot drive a replay. Verdicts now journal their own levels; `signal_memory.json` backfills history. `update_future_prices()` stays unused — the batch replay supersedes it. |
+| 2 | `gate_effectiveness.py` | GOOD / COSTLY / NEUTRAL / UNPROVEN from the VALIDATE half only; PF is None when either side of the ratio is missing; NO_FILL scores 0R (a gate that blocked something that would never fill is neutral, not protective). |
+| 3 | `mae_recompute.py` -> `learning/mae_m1.jsonl` | Sidecar, never edits the append-only journal. Reports what 60s sampling missed, plus winners-near-stop and losers-that-reached-1R. |
+| 4 | `core/order_comment.py` + `core/reconcile.py` | The comment mismatch was fixed **bot-side only** — matching both forms needs no bridge deploy and no change to what is sent to MT5. New label `MIXED_OWNERSHIP` (US30's real state). Two latent bugs found while testing: MT5 encodes BUY as integer `0`, which is falsy, so both `type or direction` and `str(v or "")` erased it. |
+| 5 | `v7_evidence_report.py` -> `learning/evidence.json`; heartbeat gains `reconciliation`; dashboard panels | One computation per statistic: when the report exists it is authoritative and the dashboard's own journal join steps aside, with the page naming its source. Cluster labels STRONG (PF>=1.30 **and** positive expectancy) / WEAK / NEUTRAL / UNPROVEN. |
+
+Cron (nightly, beside `nightly_edge.py`):
+```
+0 2 * * * cd /home/shyam/brother_sniper_v7 && python3 v7_counterfactual.py \
+          && python3 mae_recompute.py && python3 v7_evidence_report.py
+```
+Still true after all five: nothing dispatches, nothing changes a gate,
+threshold, level or weight, and every number carries its sample size.
+
 ## BUILD ORDER (each its own commit, each read-only)
 
 1. `v7_counterfactual.py` replay engine + reject-lane outcomes (§6) — the

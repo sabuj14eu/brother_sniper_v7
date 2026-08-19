@@ -286,6 +286,8 @@ def summarize(results: list[dict]) -> dict:
 
 def main(argv=None) -> int:
     argv = list(argv if argv is not None else sys.argv[1:])
+    from core.env_boot import load_env
+    load_env()          # cron/CLI runs inherit no systemd environment
     limit = None
     if "--limit" in argv:
         limit = int(argv[argv.index("--limit") + 1])

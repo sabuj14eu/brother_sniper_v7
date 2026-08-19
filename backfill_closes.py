@@ -150,6 +150,8 @@ def _get(url: str):
 
 def main(argv=None) -> int:
     argv = list(argv if argv is not None else sys.argv[1:])
+    from core.env_boot import load_env
+    load_env()          # cron/CLI runs inherit no systemd environment
     os.chdir(BASE)                        # trade_memory paths are repo-relative
     hours = (int(argv[argv.index("--hours") + 1])
              if "--hours" in argv else DEFAULT_HOURS)

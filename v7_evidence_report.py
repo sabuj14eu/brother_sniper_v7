@@ -86,6 +86,8 @@ def _read_jsonl(path: str) -> list:
 
 def main(argv=None) -> int:
     argv = list(argv if argv is not None else sys.argv[1:])
+    from core.env_boot import load_env
+    load_env()          # cron/CLI runs inherit no systemd environment
     rep = build()
     path = argv[argv.index("--out") + 1] if "--out" in argv else OUT_FILE
     os.makedirs(os.path.dirname(path), exist_ok=True)

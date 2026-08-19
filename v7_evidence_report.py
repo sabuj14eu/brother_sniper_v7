@@ -95,6 +95,21 @@ def main(argv=None) -> int:
         f.flush()
         os.fsync(f.fileno())
     os.replace(tmp, path)
+
+    # Mirror it to the platform so ONE page can show everything (the status
+    # dashboard reads the file locally; app.signalmesh.dev cannot). Same
+    # contract and same env gate as every other v7 push — inert until
+    # PLATFORM_URL and PLATFORM_SECRET are set, and a failure here can never
+    # affect the report that is already safely on disk.
+    if "--no-push" not in argv:
+        try:
+            from core.v7_status import _push
+            _push({**rep, "kind": "v7_evidence", "title": "v7 evidence report",
+                   "generated_at": rep.get("generated_at")},
+                  "/webhooks/brain/artifact")
+        except Exception as e:  # pragma: no cover - defensive
+            print(f"  (platform mirror skipped: {type(e).__name__})")
+
     # the file is already safely on disk; a summary line must never be the
     # thing that fails the job
     c = rep.get("counterfactual") or {}

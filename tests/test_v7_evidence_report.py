@@ -94,3 +94,31 @@ def test_heartbeat_omits_reconciliation_rather_than_faking_one():
     """No broker read means the desk must render UNKNOWN, not 'all clear'."""
     hb = vs.build_heartbeat({"open_trades": {}}, {})
     assert "reconciliation" not in hb
+
+
+def test_the_report_is_mirrored_to_the_platform_under_its_own_kind(tmp_path, monkeypatch):
+    """One page must be able to show everything: the status dashboard reads
+    the file locally, the platform can only be reached by a push."""
+    sent = []
+    monkeypatch.setattr(rep, "OUT_FILE", str(tmp_path / "evidence.json"))
+    monkeypatch.setattr(rep, "build", lambda *a, **k: {"schema": "v7-evidence-1",
+                                                       "generated_at": "T", "gates": []})
+    monkeypatch.setattr(vs, "_push", lambda body, path: sent.append((body, path)))
+    rep.main([])
+    body, path = sent[0]
+    assert path == "/webhooks/brain/artifact"
+    assert body["kind"] == "v7_evidence" and body["generated_at"] == "T"
+
+
+def test_the_mirror_can_be_skipped_and_never_costs_the_report(tmp_path, monkeypatch):
+    monkeypatch.setattr(rep, "OUT_FILE", str(tmp_path / "evidence.json"))
+    monkeypatch.setattr(rep, "build", lambda *a, **k: {"schema": "v7-evidence-1"})
+    sent = []
+    monkeypatch.setattr(vs, "_push", lambda body, path: sent.append(path))
+    assert rep.main(["--no-push"]) == 0 and sent == []
+    # and a push that explodes must not lose the file
+    def boom(body, path):
+        raise RuntimeError("platform down")
+    monkeypatch.setattr(vs, "_push", boom)
+    assert rep.main([]) == 0
+    assert (tmp_path / "evidence.json").exists()

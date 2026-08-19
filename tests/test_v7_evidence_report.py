@@ -122,3 +122,17 @@ def test_the_mirror_can_be_skipped_and_never_costs_the_report(tmp_path, monkeypa
     monkeypatch.setattr(vs, "_push", boom)
     assert rep.main([]) == 0
     assert (tmp_path / "evidence.json").exists()
+
+
+def test_every_breakdown_row_carries_an_explicit_key_field():
+    """The platform reads `key` first and falls back through guesses; this
+    pins `key` as the contract so the guessing is never needed. Renaming it
+    is a wire-format break and must fail here first."""
+    r = rep.build(
+        cf_rows=[],
+        unified=[trade(30.0, session="london", symbol="SILVER", grade="A",
+                       strategy_id="PULLBACK")],
+        mae_rows=[])
+    for panel in ("by_session", "by_symbol", "by_grade", "by_strategy"):
+        for row in r[panel]:
+            assert "key" in row and row["key"], (panel, row)

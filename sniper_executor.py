@@ -37,6 +37,30 @@ app = Flask(__name__)
 
 SECRET = os.getenv("WEBHOOK_SECRET", "")
 
+# ── READ-ENDPOINT KEY (optional; default OFF so nothing breaks on deploy) ────
+# The platform proxies /candles server-side for the live chart, so this port
+# is no longer reached only from our own box. When BRIDGE_KEY is set, the
+# market-DATA reads require the X-Bridge-Key header.
+#
+# Deliberately NOT applied to /health, /positions or /history: the bot and the
+# dashboard poll those, /positions is on the live trading path, and locking a
+# trading dependency to gain nothing on public market data is a bad trade.
+# Order placement is unaffected — it has always required WEBHOOK_SECRET.
+BRIDGE_KEY = os.getenv("BRIDGE_KEY", "").strip()
+
+
+def _key_ok() -> bool:
+    """True when reads are allowed. Unset key = auth off = today's behaviour."""
+    if not BRIDGE_KEY:
+        return True
+    import hmac
+    return hmac.compare_digest(request.headers.get("X-Bridge-Key", ""), BRIDGE_KEY)
+
+
+def _denied():
+    """401 without ever echoing the supplied or expected key."""
+    return jsonify({"status": "error", "msg": "bridge key required"}), 401
+
 # Symbol mapping: bot's name → IC Markets MT5 symbol
 SYMBOL_MAP = {
     # Metals
@@ -138,6 +162,8 @@ def symbolspec_route():
     decimal count collapses two tradable levels into one displayed price —
     so no coin goes live until these numbers are confirmed against the
     platform's display config. Never places anything."""
+    if not _key_ok():
+        return _denied()
     sym_in = str(request.args.get("symbol", "") or "").upper()
     sym = SYMBOL_MAP.get(sym_in, sym_in)
     try:
@@ -174,6 +200,8 @@ def symbolspec_route():
 
 @app.route("/spread", methods=["GET"])
 def spread_route():
+    if not _key_ok():
+        return _denied()
     return jsonify(_tick_spread(request.args.get("symbol", "")))
 
 
@@ -408,6 +436,8 @@ def close():
 @app.route("/candles", methods=["GET"])
 def candles():
     try:
+        if not _key_ok():
+            return _denied()
         if not ensure_mt5():
             return jsonify({"status":"error","msg":"mt5 not connected"}), 503
         raw_sym = (request.args.get("symbol") or "").upper()

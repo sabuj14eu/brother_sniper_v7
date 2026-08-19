@@ -147,6 +147,21 @@ def _read_lines(path: str):
 
 # ── candles ──────────────────────────────────────────────────────────────────
 
+def _dotenv_key(name: str) -> str:
+    """Read one key from .env. CLI/cron runs load_env() already, but a caller
+    that imported this module directly may not have — and a missing key here
+    turns into empty candle sets, not an error."""
+    try:
+        with open(os.path.join(BASE, ".env"), encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if line.startswith(name + "="):
+                    return line.split("=", 1)[1].strip()
+    except Exception:
+        pass
+    return ""
+
+
 def bridge_candles(symbol: str, tf: str = TF, n: int = MAX_BARS,
                    base_url: str | None = None) -> list[dict]:
     """Closed bars from the v7 bridge. [] on any failure — a missing feed
@@ -155,8 +170,17 @@ def bridge_candles(symbol: str, tf: str = TF, n: int = MAX_BARS,
     if not base:
         return []
     q = urllib.parse.urlencode({"symbol": symbol, "tf": tf, "n": n})
+    # The bridge's market-data reads take an optional key (BRIDGE_KEY). Send it
+    # when we have one; unset means the bridge has auth off and this is a
+    # no-op. Without this, turning the key on would silently starve every
+    # analytic of candles — and a starved replay returns UNKNOWN, which reads
+    # like "no evidence" rather than "misconfigured".
+    req = urllib.request.Request(f"{base}/candles?{q}")
+    _bk = os.getenv("BRIDGE_KEY", "").strip() or _dotenv_key("BRIDGE_KEY")
+    if _bk:
+        req.add_header("X-Bridge-Key", _bk)
     try:
-        with urllib.request.urlopen(f"{base}/candles?{q}", timeout=20) as r:
+        with urllib.request.urlopen(req, timeout=20) as r:
             data = json.loads(r.read().decode("utf-8"))
     except Exception:
         return []

@@ -408,7 +408,7 @@ def _monitor():
         if _mon_cycle % _MON_HEARTBEAT_EVERY == 0:
             log.info(f"[MON] alive — {sum(1 for _ in all_open_trades())} open trades")
         # ── [SLOT-RECON]: catch timeout-orphans — broker positions v7 isn't tracking ──
-        _bridge_ok=None
+        _bridge_ok=None; _pl=[]
         try:
             import requests as _rq2
             _b2=os.getenv("EXECUTOR_URL","").replace("/execute","")
@@ -443,8 +443,21 @@ def _monitor():
         # the desk can tell "v7 quiet" apart from "v7 down" (Iron Rule 6).
         try:
             from core.v7_status import update_heartbeat
+            # reconciliation runs on the positions the sweep ALREADY fetched —
+            # no extra broker call, and v7 is the only side that can attribute
+            # a position by its order comment.
+            _recon = None
+            try:
+                from core.reconcile import reconcile_all
+                from core.v7_status import latest_verdicts
+                _recon = reconcile_all(latest_verdicts(),
+                                       state.get("open_trades") or {},
+                                       _pl if _bridge_ok else None)
+            except Exception as _rce:
+                log.warning(f"[V7-STATUS] reconcile skipped (non-fatal): {_rce}")
             update_heartbeat(state, equity_guard.to_dict(), bridge_ok=_bridge_ok,
-                             symbols_enabled=ALLOWED_SYMBOLS)
+                             symbols_enabled=ALLOWED_SYMBOLS,
+                             reconciliation=_recon)
         except Exception as _he:
             log.warning(f"[V7-STATUS] heartbeat skipped (non-fatal): {_he}")
         if not any_open_trade(): continue

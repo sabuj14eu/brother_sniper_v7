@@ -152,9 +152,31 @@ def build_decision(payload: dict, result: dict) -> dict:
     return {k: v for k, v in rec.items() if v is not None}
 
 
+def latest_verdicts() -> dict:
+    """symbol -> the most recent verdict, for the reconciliation layer.
+    Reads the in-memory ring (re-seeded from disk on first use), so it costs
+    nothing and stays available even if the journal file is unreadable."""
+    try:
+        with _lock:
+            if not _loaded:
+                _load_existing()
+            rows = list(_decisions)
+    except Exception:  # pragma: no cover - defensive
+        return {}
+    out: dict = {}
+    for d in rows:
+        sym = str((d or {}).get("symbol") or "").upper()
+        if not sym:
+            continue
+        prev = out.get(sym)
+        if prev is None or str(d.get("ts") or "") >= str(prev.get("ts") or ""):
+            out[sym] = d
+    return out
+
+
 def build_heartbeat(state: dict, guard: dict | None = None, *,
                     bridge_ok=None, balance=None, equity=None,
-                    symbols_enabled=None) -> dict:
+                    symbols_enabled=None, reconciliation=None) -> dict:
     """One v7_heartbeat record from the live state dict (+ equity guard dict)."""
     st, gd = state or {}, guard or {}
     slots = {}
@@ -188,6 +210,7 @@ def build_heartbeat(state: dict, guard: dict | None = None, *,
         "open_slots": slots,
         "symbols_enabled": sorted(symbols_enabled) if symbols_enabled else None,
         "last_decision_ts": (_decisions[-1].get("ts") if _decisions else None),
+        "reconciliation": reconciliation,
         "bot_version": "v7",
     }
     return {k: v for k, v in hb.items() if v is not None}

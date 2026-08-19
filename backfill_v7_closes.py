@@ -89,10 +89,24 @@ def main():
     todo = pairs[start:]
     print(f"[closes] resolved trades: {len(pairs)} · already sent: {start} · pending: {len(todo)}")
 
-    sent = 0
+    sent = unsendable = 0
     for i, (sid, o, c) in enumerate(todo):
         if args.limit and sent >= args.limit:
             break
+        # An ORPHAN close — a close row with no matching open row — carries no
+        # symbol, and neither does the close record itself (trade_memory writes
+        # ids, prices and PnL only). Sending it produces symbol:null, which the
+        # platform rightly declines: that is how 2 of these silently "never
+        # arrived". Skip it and SAY SO. The symbol is not invented from the
+        # ticket, and never guessed. (Recoverable in principle for ADOPTED_<tk>
+        # rows, whose ticket is in the id, by asking the broker — worth doing
+        # only if this ever stops being a handful of rows.)
+        if not o.get("symbol"):
+            unsendable += 1
+            print(f"[skip] {sid} — orphan close, no open row and therefore no "
+                  f"symbol; not sent (never invent one)")
+            open(CURSOR, "w").write(str(start + i + 1))
+            continue
         net = float(c.get("net_profit") or 0)
         body = build_v7_payload(
             {"signal_id": sid, "symbol": o.get("symbol"), "direction": o.get("direction"),
@@ -123,7 +137,9 @@ def main():
         if args.sleep:
             time.sleep(args.sleep)
 
-    print(f"[closes] sent {sent}" + (" (DRY RUN — nothing posted)" if args.dry_run else ""))
+    print(f"[closes] sent {sent}"
+          + (f" · skipped {unsendable} orphan (no symbol)" if unsendable else "")
+          + (" (DRY RUN — nothing posted)" if args.dry_run else ""))
 
 
 if __name__ == "__main__":

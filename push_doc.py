@@ -89,6 +89,32 @@ def title_of(text: str, fallback: str) -> str:
     return fallback
 
 
+# The v7 box lives on another session's branch, so these docs are usually NOT
+# in its working tree — the first run of this tool skipped all three for that
+# reason. Reading them straight out of git removes the hand-checkout step that
+# kept failing, and reads the SAME bytes that were reviewed and pushed.
+DOC_REF = os.getenv("DOC_SOURCE_REF", "origin/claude/brain-platform-mirror-fcacwl")
+
+
+def read_doc(rel_path: str, ref: str = "") -> tuple:
+    """(text, source). Working tree first; then git. None when neither has it."""
+    full = rel_path if os.path.isabs(rel_path) else os.path.join(BASE, rel_path)
+    try:
+        with open(full, encoding="utf-8") as f:
+            return f.read(), "worktree"
+    except FileNotFoundError:
+        pass
+    ref = ref or DOC_REF
+    try:
+        out = subprocess.run(["git", "show", f"{ref}:{rel_path}"], cwd=BASE,
+                             capture_output=True, text=True, timeout=15)
+        if out.returncode == 0 and out.stdout:
+            return out.stdout, ref
+    except Exception:
+        pass
+    return None, ""
+
+
 def _sha() -> str:
     try:
         out = subprocess.run(["git", "rev-parse", "--short", "HEAD"], cwd=BASE,
@@ -134,13 +160,12 @@ def main(argv=None) -> int:
         return 1
 
     sha, sent, failed = _sha(), 0, 0
+    ref = argv[argv.index("--ref") + 1] if "--ref" in argv else ""
     for rel in docs:
-        full = rel if os.path.isabs(rel) else os.path.join(BASE, rel)
-        try:
-            with open(full, encoding="utf-8") as f:
-                text = f.read()
-        except FileNotFoundError:
-            print(f"  SKIP {rel} — not on this branch")
+        text, src = read_doc(rel, ref)
+        if text is None:
+            print(f"  SKIP {rel} — not in the working tree and not in "
+                  f"{ref or DOC_REF} (fetch that branch first)")
             continue
 
         hits = scan_secrets(text)
@@ -154,7 +179,7 @@ def main(argv=None) -> int:
 
         payload = build_payload(rel, text, sha)
         if dry:
-            print(f"  [dry] {rel} · {payload['bytes']}B · "
+            print(f"  [dry] {rel} · {payload['bytes']}B · from {src} · "
                   f"title={payload['title'][:48]!r}")
             sent += 1
             continue

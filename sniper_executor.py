@@ -13,7 +13,7 @@ Changes from v2:
 """
 from flask import Flask, request, jsonify
 import MetaTrader5 as mt5
-import logging, os, sys, traceback
+import logging, os, re, sys, time, traceback
 from logging.handlers import RotatingFileHandler
 from datetime import datetime, timedelta
 
@@ -120,6 +120,100 @@ SYMBOL_MAP.update({
     "USDX":   os.getenv("MT5_DXY_SYMBOL", "DXY_U6"),
 })
 
+# ── FRONT-CONTRACT RESOLVER (macro read paths only) ─────────────────────────
+# The static entries above name SEPTEMBER 2026 contracts. In a few weeks they
+# expire, stop printing bars, and return nothing — with no error anywhere.
+# That is the USDX bug's cousin: a name that resolves to a symbol the broker
+# no longer serves is indistinguishable from a quiet market.
+#
+# So the macro roots resolve to their FRONT (nearest non-expired) contract at
+# request time, refreshed hourly. When no valid contract exists the answer is
+# NOTHING — the caller reports UNKNOWN. A silently expired contract is never
+# served, and an expiring one is never "fixed" by guessing the next code.
+#
+# READ PATHS ONLY. /execute still uses SYMBOL_MAP directly: the trading path
+# does not change because of a resolver written for analytics.
+_MACRO_ROOTS = {"DXY": "DXY", "USDX": "DXY",
+                "US10Y": "UST10Y", "UST10Y": "UST10Y",
+                "US30Y": "UST30Y", "UST30Y": "UST30Y"}
+_MONTH_CODES = "FGHJKMNQUVXZ"          # CME: F=Jan, G=Feb ... Z=Dec
+_CONTRACT_RE = re.compile(r"^[A-Z0-9]+_([FGHJKMNQUVXZ])(\d{1,2})$")
+_FRONT_TTL = 3600
+_front_cache = {}
+
+
+def parse_contract_expiry(name, now_ts):
+    """Approximate expiry from a CME-style suffix (DXY_U6 -> end of Sep 2026).
+
+    Fallback only — MT5's own expiration_time wins when the broker supplies
+    it. A single-digit year is read into the current decade, rolling forward
+    when that would place the contract in the past."""
+    m = _CONTRACT_RE.match(str(name or "").upper())
+    if not m:
+        return None
+    month = _MONTH_CODES.index(m.group(1)) + 1
+    yr = m.group(2)
+    now = datetime.utcfromtimestamp(now_ts)
+    if len(yr) == 2:
+        year = 2000 + int(yr)
+    else:
+        year = (now.year // 10) * 10 + int(yr)
+        if year < now.year - 1:
+            year += 10
+    # Valid through the END of its month: the first instant of the next one.
+    ny, nm = (year + 1, 1) if month == 12 else (year, month + 1)
+    return (datetime(ny, nm, 1) - datetime(1970, 1, 1)).total_seconds()
+
+
+def pick_front(candidates, now_ts):
+    """[(name, expiration_ts)] -> the nearest contract that has NOT expired.
+
+    None when every candidate is expired or unreadable. Returning None is the
+    point: the caller must then say UNKNOWN rather than serve a dead series."""
+    live = []
+    for name, exp in candidates or []:
+        e = exp if exp and exp > 0 else parse_contract_expiry(name, now_ts)
+        if e and e > now_ts:
+            live.append((e, name))
+    if not live:
+        return None
+    return min(live)[1]
+
+
+def _macro_front(root):
+    """Front contract for one macro root, cached for an hour. Never raises."""
+    now = time.time()
+    hit = _front_cache.get(root)
+    if hit and now - hit[1] < _FRONT_TTL:
+        return hit[0]
+    best = None
+    try:
+        cands = []
+        for s in (mt5.symbols_get(f"*{root}*") or []):
+            nm = str(getattr(s, "name", "") or "").upper()
+            if nm.startswith(root + "_") and _CONTRACT_RE.match(nm):
+                cands.append((nm, int(getattr(s, "expiration_time", 0) or 0)))
+        best = pick_front(cands, now)
+        prev = (hit or (None,))[0]
+        if best != prev:
+            log.warning(f"[MACRO] {root} front contract -> {best or 'NONE'} "
+                        f"(was {prev or 'unset'}; {len(cands)} candidates)")
+    except Exception as e:
+        log.warning(f"[MACRO] {root} front-contract lookup failed: {e}")
+    _front_cache[root] = (best, now)
+    return best
+
+
+def _resolve_symbol(raw):
+    """Read-path resolution. Macro roots -> front dated contract (or "" when
+    none is live); everything else -> the static map, unchanged."""
+    up = str(raw or "").upper()
+    root = _MACRO_ROOTS.get(up)
+    if not root:
+        return SYMBOL_MAP.get(up, up)
+    override = os.getenv(f"MT5_{up}_SYMBOL", "").strip()
+    return override or (_macro_front(root) or "")
+
 # ── MT5 CONNECTION MANAGEMENT ───────────────────────────────────────────────
 _off_cache = {"t": 0.0, "off": 0}
 def _broker_utc_offset():
@@ -143,7 +237,10 @@ def _tick_spread(symbol):
     the analytics spread-at-decision source (Pine's v6_spread is only a
     range-stress proxy, not real spread)."""
     try:
-        sym = SYMBOL_MAP.get(str(symbol or "").upper(), str(symbol or "").upper())
+        sym = _resolve_symbol(symbol)
+        if not sym:
+            return {"symbol": str(symbol or "").upper(), "spread": None,
+                    "reason": "no live contract (dated contract rolled?)"}
         tk = mt5.symbol_info_tick(sym)
         info = mt5.symbol_info(sym)
         if not tk or not tk.bid or not tk.ask:
@@ -195,7 +292,12 @@ def symbolspec_route():
     if not _key_ok():
         return _denied()
     sym_in = str(request.args.get("symbol", "") or "").upper()
-    sym = SYMBOL_MAP.get(sym_in, sym_in)
+    sym = _resolve_symbol(sym_in)
+    if not sym:
+        return jsonify({"requested": sym_in, "ok": False,
+                        "reason": "no_live_contract",
+                        "detail": "dated contract rolled and no successor is "
+                                  "listed — reporting UNKNOWN, not a dead series"}), 404
     try:
         if not ensure_mt5():
             return jsonify({"symbol": sym, "ok": False, "reason": "mt5_not_connected"}), 503
@@ -469,7 +571,11 @@ def candles():
         if not ensure_mt5():
             return jsonify({"status":"error","msg":"mt5 not connected"}), 503
         raw_sym = (request.args.get("symbol") or "").upper()
-        symbol = SYMBOL_MAP.get(raw_sym, raw_sym)
+        symbol = _resolve_symbol(raw_sym)
+        if not symbol:
+            return jsonify({"status":"error","msg":f"no live contract for {raw_sym} "
+                            "— the dated contract rolled and no successor is listed",
+                            "macro_unresolved":True}), 404
         tf_str = (request.args.get("tf") or "15").strip()
         n = int(request.args.get("n") or 100)
         n = max(1, min(n, 5000))

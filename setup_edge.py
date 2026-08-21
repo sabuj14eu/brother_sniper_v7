@@ -96,6 +96,20 @@ def row_r(row: dict):
     return net / (bal * rp)
 
 
+# Pine does not send four grades, it sends eight strings: A, A+, B, D and
+# also "A+ strong", "A strong", "B ok", "C ok". Bucketing them verbatim
+# scatters one grade across two rows and makes every cell look too thin to
+# read — which is exactly how the collection week appeared to have produced
+# no C/D data when 29 of them had fired. The qualifier is commentary; the
+# grade is the first token.
+def _norm_grade(s: str) -> str:
+    head = s.split()
+    return head[0] if head else s
+
+
+_NORMALIZE = {"grade": _norm_grade}
+
+
 def _val(row: dict, dim: str):
     """The row's value for one dimension, or None if it never recorded it.
     Empty strings count as missing — a blank is absence, not a category."""
@@ -105,7 +119,7 @@ def _val(row: dict, dim: str):
             continue
         s = str(v).strip()
         if s and s.lower() not in ("none", "null", "unknown", "-", "—"):
-            return s.upper()
+            return _NORMALIZE.get(dim, lambda x: x)(s.upper())
     return None
 
 

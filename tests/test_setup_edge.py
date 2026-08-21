@@ -120,6 +120,27 @@ def test_direction_alias_is_read():
     assert fam["rows"][0]["key"] == "GOLD · SELL"
 
 
+def test_grade_qualifiers_merge_into_one_bucket():
+    """Pine sends "A+ strong" and "A+" for the same grade. Bucketed verbatim
+    they read as two thin cells; the collection week looked empty for exactly
+    this reason while 29 C/D signals had actually fired."""
+    for raw, want in [("A+ strong", "A+"), ("A strong", "A"), ("B ok", "B"),
+                      ("C ok", "C"), ("D", "D"), ("a+", "A+")]:
+        assert se._val({"grade": raw}, "grade") == want
+
+
+def test_grade_merge_reaches_the_buckets():
+    rows = ([_trade(10.0, grade="A+ strong")] * 3 + [_trade(-5.0, grade="A+")] * 3)
+    fam = se.by_combo(rows, ("grade", "side"))
+    assert [r["key"] for r in fam["rows"]] == ["A+ · BUY"]
+    assert fam["rows"][0]["n"] == 6
+
+
+def test_other_dimensions_are_not_token_split():
+    """Only grade is normalised — a two-word session or symbol must survive."""
+    assert se._val({"session": "NEW YORK"}, "session") == "NEW YORK"
+
+
 def test_blank_strings_count_as_missing():
     for blank in ("", "  ", "none", "UNKNOWN", "—"):
         assert se._val({"session": blank}, "session") is None

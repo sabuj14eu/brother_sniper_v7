@@ -21,6 +21,7 @@ pasted tokens; publishing is irreversible.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -52,8 +53,23 @@ DEFAULT_DOCS = [
 # that line without a list of exceptions.
 _SECRET_LINE = re.compile(
     r"(?i)[A-Z0-9_.\-]*"
-    r"(secret|token|password|passwd|api[_-]?key|private[_-]?key)"
-    r"[A-Z0-9_.\-]*\s*[:=]\s*\S{8,}")
+    # `key` is in the list on its own, not merely as api_key/private_key: the
+    # guard failed to catch BRIDGE_KEY=<48 hex> — the very secret that reached
+    # a chat window this week — because that name matched neither. A narrow
+    # allowlist of secret-sounding names is a guard that protects the names you
+    # already thought of.
+    r"(secret|token|password|passwd|key)"
+    r"[A-Z0-9_.\-]*\s*[:=]\s*(?P<val>\S{8,})")
+
+# ...but source files READ secrets constantly, and a read is not a leak:
+#     SECRET = os.getenv("WEBHOOK_SECRET", "")
+# blocked the bridge file on its first relay. What distinguishes a pasted
+# credential from a reference is that a literal has no call and no lookup —
+# a real key never contains "(" or "[". Placeholders are skipped too, since
+# <PASTE_KEY> and $BRIDGE_KEY are instructions, not secrets.
+_VALUE_IS_REFERENCE = re.compile(
+    r"""^["']?\s*(os\.(getenv|environ)|getenv|environ|process\.env|"""
+    r"""System\.getenv|<|\$|\{\{|%|None\b|""\B|''\B)""", re.I)
 
 
 def _env(key: str) -> str:
@@ -77,8 +93,13 @@ def scan_secrets(text: str) -> list:
     for i, line in enumerate(text.splitlines(), 1):
         # No exemption for comment or quote lines: a relayed message pasted
         # into a doc as "> PLATFORM_SECRET=..." is exactly how one escapes.
-        if _SECRET_LINE.search(line):
-            hits.append((i, line.strip()[:60]))
+        m = _SECRET_LINE.search(line)
+        if not m:
+            continue
+        val = m.group("val")
+        if "(" in val or "[" in val or _VALUE_IS_REFERENCE.match(val):
+            continue                      # a reference to a secret, not one
+        hits.append((i, line.strip()[:60]))
     return hits
 
 
@@ -124,8 +145,14 @@ def _sha() -> str:
         return "unknown"
 
 
+_FORMATS = {".md": "markdown", ".py": "python", ".txt": "text",
+            ".json": "json", ".yml": "yaml", ".yaml": "yaml"}
+
+
 def build_payload(rel_path: str, text: str, sha: str) -> dict:
     name = os.path.basename(rel_path)
+    body = text.encode("utf-8")
+    fmt = _FORMATS.get(os.path.splitext(name)[1].lower(), "text")
     return {
         "kind": "doc",
         "doc_id": name,
@@ -133,9 +160,17 @@ def build_payload(rel_path: str, text: str, sha: str) -> dict:
         "repo": "brother_sniper_v7",
         "path": rel_path,
         "commit": sha,
-        "format": "markdown",
+        "format": fmt,
+        # `markdown` stays for back-compat with the existing reader; `content`
+        # is the same bytes under an honest name now that code travels here.
         "markdown": text,
-        "bytes": len(text.encode("utf-8")),
+        "content": text,
+        # The receiving side serves this file for download, so it needs the
+        # digest of what was actually sent — not one computed later from a
+        # copy. An updater that checks a hash against the same file it just
+        # fetched proves nothing; this is the digest at the source of truth.
+        "sha256": hashlib.sha256(body).hexdigest(),
+        "bytes": len(body),
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
     }
 

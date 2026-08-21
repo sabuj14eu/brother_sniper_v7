@@ -20,8 +20,47 @@ def test_catches_pasted_credentials():
         "api_key: bb_yemsUiwDOGwJRyiROKQtaZLSdnOFLI9swMtJFthxhI4",
         "  password = hunter2hunter2",
         "WEBHOOK_TOKEN=abcd1234efgh5678",
+        # BRIDGE_KEY matched neither api_key nor private_key, so the guard
+        # sailed past the one secret that actually reached a chat window.
+        "BRIDGE_KEY=e341a9a25e93cb53c1e149fe6ab341dbd3c74d6566d9b0ec",
+        "BB_API_KEY=bb_abcdefgh12345678",
     ]:
         assert pd.scan_secrets(f"# Doc\n\n{bad}\n"), f"guard missed: {bad}"
+
+
+def test_allows_code_that_READS_a_secret():
+    """Source files reference secrets constantly; a read is not a leak. This
+    blocked sniper_executor.py on its first relay."""
+    for ok in [
+        'SECRET = os.getenv("WEBHOOK_SECRET", "")',
+        'key = os.environ["BB_API_KEY"]',
+        'BRIDGE_KEY = os.getenv("BRIDGE_KEY", "").strip()',
+        'BRIDGE_KEY=<PASTE_YOUR_KEY_HERE>',
+        'echo "BRIDGE_KEY=$MYKEY" >> .env',
+        "X-Brain-Secret: {{ secret }}",
+        "api_key = None",
+    ]:
+        assert not pd.scan_secrets(ok), f"false positive: {ok}"
+
+
+def test_the_repo_source_files_are_publishable():
+    """The files this relay exists to carry must actually pass the guard."""
+    for name in ("sniper_executor.py", "push_doc.py", "setup_edge.py"):
+        path = os.path.join(pd.BASE, name)
+        if os.path.exists(path):
+            with open(path, encoding="utf-8") as f:
+                assert not pd.scan_secrets(f.read()), f"{name} would be refused"
+
+
+def test_payload_carries_format_and_digest():
+    """The receiver serves this file for download, so it needs the digest of
+    what was sent — a hash checked against the same copy proves nothing."""
+    import hashlib
+    p = pd.build_payload("sniper_executor.py", "print(1)\n", "abc")
+    assert p["format"] == "python"
+    assert p["sha256"] == hashlib.sha256(b"print(1)\n").hexdigest()
+    assert p["content"] == p["markdown"] == "print(1)\n"
+    assert pd.build_payload("docs/X.md", "# T\n", "a")["format"] == "markdown"
 
 
 def test_reports_line_number_and_preview():

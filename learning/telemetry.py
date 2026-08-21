@@ -36,7 +36,15 @@ _SCHEMA_GROUPS = {
                  "weight_version", "cluster_version"],
     "market": ["symbol", "side", "session", "hour", "day_of_week", "week",
                "regime", "bid", "ask", "spread", "atr", "adx", "rsi",
-               "dxy", "oil", "us10y", "vix", "volatility"],
+               "dxy", "oil", "us10y", "vix", "volatility",
+               # 08-21 APPEND-ONLY: Pine v18.12 emits entry_dist_atr (how far
+               # price had already travelled from the zone, in ATR) on every
+               # scalp payload. This column is the SECOND population for the
+               # >3 ATR distance question — the platform's paper lanes are
+               # the first, and nothing gates until both agree. Forward-only:
+               # every trade fired before this column landed dropped the
+               # value, so the n>=20-30 per bucket clock starts now.
+               "entry_dist_atr"],
     "structure": ["bos", "choch", "fvg", "liquidity_sweep", "order_block",
                   "zone", "htf_align", "setup_type", "strategy_id"],
     "ai": ["grade", "ai_score", "pine_score", "council_votes", "confidence",
@@ -107,6 +115,7 @@ def capture_reject(payload: dict, status: str, reason: str) -> None:
             regime=payload.get("regime"),
             atr=payload.get("atr"), adx=payload.get("adx"), rsi=payload.get("rsi"),
             dxy=payload.get("dxy_dir"), us10y=payload.get("yield_dir"),
+            entry_dist_atr=payload.get("entry_dist_atr"),
             zone=payload.get("zone") or payload.get("loc_zone"),
             setup_type=payload.get("type"),
             grade=payload.get("grade"), pine_score=payload.get("score"),

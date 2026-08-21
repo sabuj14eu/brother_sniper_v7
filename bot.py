@@ -1040,6 +1040,11 @@ def handle_signal(payload: dict, raw_body: bytes = b"") -> dict:
                     atr=atr, adx=adx, rsi=payload.get("rsi"),
                     dxy=payload.get("dxy_dir"), oil=payload.get("oil_spike"),
                     us10y=payload.get("yield_dir"),
+                    # 08-21 entry_dist_atr: Pine v18.12 appends it to every
+                    # scalp payload; captured verbatim (never computed here,
+                    # so the column means ONE thing). Log-only, like every
+                    # field in this block — the trade is already placed.
+                    entry_dist_atr=payload.get("entry_dist_atr"),
                     zone=payload.get("zone") or payload.get("loc_zone"),
                     setup_type=payload.get("type"), htf_align=htf_trend,
                     strategy_id=__import__("learning.strategy_dna", fromlist=["classify"]).classify(payload),

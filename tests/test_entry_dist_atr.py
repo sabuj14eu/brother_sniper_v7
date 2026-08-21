@@ -100,3 +100,51 @@ def test_box_patch_script_is_idempotent_and_anchor_safe(tmp_path):
                         cwd=work, capture_output=True, text=True)
     assert r3.returncode == 1 and "ABORT" in r3.stdout
     assert (work / "bot.py").read_text() == dup            # nothing changed
+
+
+def test_mirror_close_patch_script(tmp_path):
+    """patch_mirror_close.py: splices the close mirror into a pristine
+    bot.py, refuses to run twice, and aborts when the mirror module is
+    missing or predates mirror_v7_close."""
+    script = (ROOT / "patch_mirror_close.py").read_text()
+    anchor = '                    equity_guard.record_trade(net, tracked["symbol"])\n'
+    fake_bot = ("def close_path(tracked, net, won, cp, _hold, equity_guard, log):\n"
+                "    if True:\n"
+                "        if True:\n"
+                "            if True:\n"
+                "                if True:\n"
+                + anchor +
+                "                    pass\n")
+
+    work = tmp_path / "box"
+    (work / "learning").mkdir(parents=True)
+    (work / "patch_mirror_close.py").write_text(script)
+    (work / "bot.py").write_text(fake_bot)
+
+    # (a) module missing -> abort, untouched
+    r0 = subprocess.run([sys.executable, "patch_mirror_close.py"],
+                        cwd=work, capture_output=True, text=True)
+    assert r0.returncode == 1 and "does not exist" in r0.stdout
+    assert (work / "bot.py").read_text() == fake_bot
+
+    # (b) module too old (no mirror_v7_close) -> abort, untouched
+    (work / "learning" / "platform_mirror.py").write_text("def mirror_v7(p): pass\n")
+    r1 = subprocess.run([sys.executable, "patch_mirror_close.py"],
+                        cwd=work, capture_output=True, text=True)
+    assert r1.returncode == 1 and "predates" in r1.stdout
+    assert (work / "bot.py").read_text() == fake_bot
+
+    # (c) module current -> patches, compiles
+    (work / "learning" / "platform_mirror.py").write_text(
+        "def mirror_v7_close(tracked, net, won, close_price=None, hold_seconds=None):\n    pass\n")
+    r2 = subprocess.run([sys.executable, "patch_mirror_close.py"],
+                        cwd=work, capture_output=True, text=True)
+    assert r2.returncode == 0 and "PATCHED bot.py" in r2.stdout, r2.stdout
+    patched = (work / "bot.py").read_text()
+    assert "mirror_v7_close(tracked, net, won, close_price=float(cp), hold_seconds=_hold)" in patched
+
+    # (d) second run refuses, changes nothing
+    r3 = subprocess.run([sys.executable, "patch_mirror_close.py"],
+                        cwd=work, capture_output=True, text=True)
+    assert r3.returncode == 0 and "ALREADY PATCHED" in r3.stdout
+    assert (work / "bot.py").read_text() == patched

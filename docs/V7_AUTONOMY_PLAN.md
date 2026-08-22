@@ -88,3 +88,20 @@ changes and gate enforcement are explicit human decisions with their
 rationale logged. Shadow first, n>=20 before judging, ~100 before
 trusting, two independent populations before a rule moves. NO
 ROBUST EDGE and CANNOT SEPARATE remain first-class outcomes.
+
+## Symbol universe (decided 2026-08-22)
+
+Three doors, all required: Pine detects → v7 accepts → broker probed.
+- TRADING/ALERTABLE NOW (7): GOLD, SILVER, BTC, ETH, USDJPY, and — after
+  a Windows probe of the literal names USTEC/US30 (the bridge map has no
+  entry for them; unmapped names pass through verbatim, the RIPPLE
+  failure shape) — US30, US100. EURUSD toggle exists, default OFF.
+- CANDLES ONLY (all 14 via BB_CANDLE_SYMBOLS, registry-level append):
+  GBPUSD/USDCAD/USDCHF/AUDUSD/NZDUSD (Pine cannot see them — UNKNOWN,
+  no webhook by design) and SOL (whole-lot volume_min 1.0: size cannot
+  be tuned to risk; digits unverified).
+- The five majors + SOL join trading only via a deliberate Pine v18.13
+  (detection + per-market thresholds + ceremony), justified by evidence
+  after the collection weeks. Depth beats breadth: SILVER/US100 are the
+  measured strongest; every added symbol multiplies risk surface, not
+  edge. No batch enablement, ever — one instrument, probed end to end.

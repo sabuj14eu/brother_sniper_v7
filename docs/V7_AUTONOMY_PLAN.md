@@ -105,3 +105,23 @@ Three doors, all required: Pine detects → v7 accepts → broker probed.
   after the collection weeks. Depth beats breadth: SILVER/US100 are the
   measured strongest; every added symbol multiplies risk surface, not
   edge. No batch enablement, ever — one instrument, probed end to end.
+
+## Findings from the first radar read (2026-08-24)
+
+- SILVER 3d / US100 5d bias age: alerts CONFIRMED ACTIVE in TradingView;
+  the journal shows the raw tickers firing (TVC:SILVER Aug 21 19:45,
+  PURPLETRADING:US100 Aug 19). The silence is Pine finding no qualifying
+  setup — honest quiet, not a dead feed. Watch this week; escalate only
+  if SILVER stays silent through sessions where GOLD fires daily.
+- AgentError root cause: WEEKLY AI BUDGET EXHAUSTED ($10.37/$10.00)
+  since Aug 22 — council-routed signals fail-soft to pine_trust twice a
+  day, then FAIL CLOSED. A money decision, Shyam's alone: raise the cap
+  in the brain .env, wait for the weekly reset, or accept fail-closed.
+- NEW ORGAN CANDIDATE (stage 6): PENDING-ORDER TTL. A SILVER SELL
+  0.03 placed 10 DAYS ago sat PENDING at the broker with no SL/TP
+  attached — the freshness-gate scenario in physical form. Manual
+  cancel now; the automated rule (cancel/re-evaluate pending orders
+  older than N bars) goes through the same shadow-then-enforce path as
+  the freshness gate. Journal noise noted: 0x… Polymarket condition_ids
+  and TESTUSD/MIRRORTEST rows are historical, outside the 30d bias
+  window, harmless.

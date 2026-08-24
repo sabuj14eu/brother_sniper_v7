@@ -125,3 +125,35 @@ Three doors, all required: Pine detects → v7 accepts → broker probed.
   the freshness gate. Journal noise noted: 0x… Polymarket condition_ids
   and TESTUSD/MIRRORTEST rows are historical, outside the 30d bias
   window, harmless.
+
+## DECISION LOG — GOLD demo collection (Shyam, 2026-08-24)
+
+GOLD v7 DEMO COLLECTION
+  Gate: ENABLED (un-benched in asset gate, or confirmed never benched)
+  Purpose: SECOND-POPULATION MEASUREMENT ONLY — does GOLD still bleed
+    when traded under the new instrumentation? Not "more GOLD data";
+    the rejected population is rich already. The missing piece is
+    ACTUALLY-TRADED GOLD under: entry_dist_atr LIVE · shadow gate LIVE
+    · mirrored closes LIVE · rebuilt candle integrity · reject telemetry.
+  Account: DEMO (all accounts are demo; no real money exists anywhere)
+  Position sizing: UNCHANGED (Iron Rule 7 — nothing widens)
+  Production/risk rules: NO CHANGE
+  Window: from 2026-08-24 market open to Friday 2026-08-29 close —
+    the week's GOLD trades are identified by this timestamp window plus
+    this log entry. Populations stay structurally separate as always:
+    platform lane observations vs v7 telemetry+trades; nothing from
+    this week is "validated production evidence" — collection only.
+  Review: at window close. Decision: RE-GATE or KEEP ENABLED, from the
+    rejected-vs-traded comparison, never from P/L feelings. If GOLD
+    bleeds again under clean instrumentation, that is STRONG evidence
+    to keep it gated — a successful experiment either way.
+  Explicit non-goal: "GOLD is doing well, enable permanently" is NOT
+    an available outcome of this week. COLLECT → MEASURE → REVIEW →
+    DECIDE, one step per week, same as everything else here.
+
+Platform-side ask (relayed to the app session): a /v7 comparison view,
+GOLD rejected vs GOLD actually-traded, cut by: candidates, fills, WR,
+expectancy, P/L, R:R, entry_dist_atr bucket, grade, session, structure,
+rejection reason, MAE/MFE where present. Bot-side data already flows
+(capture_reject + telemetry + trades.jsonl, joined by signal_id via
+load_unified).

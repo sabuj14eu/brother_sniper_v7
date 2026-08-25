@@ -1,0 +1,79 @@
+# ADAPTIVE GATES — gates protect, they do not blind (Shyam, 2026-08-24)
+
+The principle, verbatim: teach the bot "GOLD loses under these
+conditions — protect capital there; when a different, historically
+validated condition appears, recognize the difference and act."
+Selectively brave: not blindly brave, not permanently scared.
+
+## The two gate families (absolute distinction)
+
+HARD SAFETY GATES — learning can NEVER override:
+  broker/execution unavailable · stale or corrupt data · impossible or
+  missing price · spread beyond absolute limit · duplicate/corrupt
+  candle stream · risk/position limits · emergency state · invalid SL ·
+  R:R floor · dedupe. These exist in v7 today and stay absolute.
+
+ADAPTIVE GATES — evidence-driven, conditional, four states:
+  🟢 ALLOW    measured positive cell at the condition
+  🟡 CAUTION  weaker evidence -> REDUCED RISK, stricter confirmation
+              (mechanism already built: ASSET_GATE_SIZE multiplier and
+              the cluster 0.25x/0.5x/1.0x learning scale)
+  ⚪ WAIT     setup not ready (structure developing, post-news pending)
+  🔴 BLOCK    hard gate, or strongly validated negative condition
+UNKNOWN cells (resolved n < 20) are UNKNOWN — never proven, never
+pretended, never traded as if measured.
+
+## What already implements this (do not rebuild)
+
+- Conditional EV per cluster + learning-phase sizing: cluster_engine
+  (live in production sizing today).
+- Rejected candidates as full observations: capture_reject + context +
+  entry_dist_atr (live).
+- Shadow-as-bridge: the freshness gate's shadow mode is THE pattern —
+  every adaptive gate ships shadow-first.
+- CAUTION lever: ASSET_GATE_SIZE (built, dormant, clamped <=1.0 so it
+  can only ever reduce risk).
+- Platform mirrors of the same idea: distance_confounders, funnel,
+  setup_edge.
+
+## The new organ: learning/conditional_profile.py (2026-08-24)
+
+Read model over the unified feature store (telemetry + journal by
+signal_id). context_of() keys every row by symbol/side/alignment/
+session/grade-band/distance-bucket/news-band with honest UNKNOWNs;
+profile_verdict() answers with HIERARCHICAL BACKOFF — most specific
+cell first, dropping dimensions (news -> grade -> dist -> session ->
+side -> aligned) until a cell reaches n>=20, reporting which level
+answered; below the floor everywhere -> UNKNOWN, "do not pretend".
+CLI report, read-only, safe on the box any time:
+    python3 -m learning.conditional_profile GOLD
+
+## Path to production (never skipped, per Shyam §12)
+
+  OFFLINE REPORT (now) -> SHADOW wiring (adaptive verdict logged beside
+  every decision, blocks nothing) -> EVIDENCE REVIEW (n floors, both
+  populations, validate split) -> EXPLICIT HUMAN APPROVAL -> deploy via
+  ceremony, CAUTION before ALLOW, one organ per week -> MEASURE.
+  Never: yesterday-bad -> AI edits gate -> today-trades.
+
+## News modes (recorded; built through the same path)
+
+  🟢 NORMAL -> 🟡 PRE-EVENT (tighter conditions, no chasing) ->
+  🟠 EVENT (a REGIME, not a dead zone — participate only where the
+  measured event profile is positive) -> POST-NEWS (wait for vol
+  stabilization + first structure + retest/rejection, then evaluate
+  normally — potentially the best window).
+  Learned per asset x event type (GOLD+CPI is not GOLD+FOMC), from
+  event_reactions + news_minutes + outcomes. The current HIGH-news
+  block stays until the measured profiles exist — then PRE/EVENT/POST
+  become conditional, through review and approval, not by feeling.
+
+## Build order (one organ per week, evidence names the order)
+
+  Week now: COLLECTION — untouched. The CLI report may be run
+    read-only; it changes nothing.
+  Next: shadow wiring of profile_verdict at the decision site
+    (anchor-safe patch, logs [ADAPTIVE SHADOW], telemetry-tagged).
+  Then: first CAUTION mapping via ASSET_GATE_SIZE where a NEGATIVE
+    CELL is MEASURED and both populations agree; news PRE/POST modes;
+    event profiles.

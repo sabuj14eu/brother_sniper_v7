@@ -77,3 +77,29 @@ CLI report, read-only, safe on the box any time:
   Then: first CAUTION mapping via ASSET_GATE_SIZE where a NEGATIVE
     CELL is MEASURED and both populations agree; news PRE/POST modes;
     event profiles.
+
+## Developer verdict (Shyam, 2026-08-24): 🟢 APPROVED
+Direction right. Gates do NOT loosen yet. This week builds the cells.
+Week-end review dimensions: GOLD/SILVER/US100/BTC/ETH x session x side x
+alignment x grade x entry distance x news regime x event type.
+THE HEADLINE NUMBER of the review: how many currently blocked setups
+would have become profitable if allowed — the measure of whether gates
+protect or suffocate. Sources: capture_reject telemetry (v7) +
+v7_counterfactual nightly (bot box) + platform mirrored rejects.
+The question is no longer "should GOLD be enabled" but "WHEN should
+GOLD be enabled."
+
+## Adaptive Decision card (UI spec, approved format — platform-side)
+Rendered on /chart + radar, DISPLAY ONLY, from mirrored data the
+platform already stores (raw_payload carries grade/session/
+entry_dist_atr; status carries approved/rejected; alignment from bias):
+  BOT LIVE | asset + setup state | OVERALL ASSET PROFILE (colour + EV)
+  | CURRENT CONDITIONAL PROFILE (POSITIVE/NEGATIVE CELL or UNKNOWN,
+  n=, the condition named: "NY · trend aligned · A-grade · near entry")
+  | CONFIDENCE (MEASURED/DEVELOPING/LUCK-ZONE) | CONFIRMATION line |
+  ADAPTIVE DECISION (ALLOW/CAUTION/WAIT/BLOCK — shadow-labelled until
+  approved for enforcement). News regime card same shape: NORMAL/PRE/
+  EVENT/POST + per asset x event historical profile + "waiting for
+  post-news confirmation" instead of a bare block.
+UNKNOWN cells render as UNKNOWN with their n — never coloured as a
+verdict. The card EXPLAINS; it does not gate until the ceremony says so.

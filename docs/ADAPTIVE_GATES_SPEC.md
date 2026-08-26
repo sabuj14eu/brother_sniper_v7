@@ -103,3 +103,25 @@ entry_dist_atr; status carries approved/rejected; alignment from bias):
   post-news confirmation" instead of a bare block.
 UNKNOWN cells render as UNKNOWN with their n — never coloured as a
 verdict. The card EXPLAINS; it does not gate until the ceremony says so.
+
+## Platform delivery confirmed (2026-08-26, v4.65–v4.68)
+
+- Outlook authorship LOUD: 🤖 AUTO badge vs 👤 human, supersession
+  history visible. The auto-weekly cron can never impersonate Shyam.
+- Adaptive Decision card COMPLETE platform-side: named condition,
+  dropped dimensions, backoff level always stated (exact-cell answers
+  no longer render silence), SHADOW label until enforcement approved.
+- ⚖️ GOLD rejected-vs-traded LIVE on /v7 per the DECISION LOG spec:
+  summary strip, four cuts, both populations per cell, v7's rejection
+  reasons verbatim, "DECIDES NOTHING yet" under n>=20 closed. Their
+  mirror-purity guard test correctly forced the computation into its
+  own module (decision_log.py) — the mirror stays a mirror.
+- PLAT-OUTLOOK-1 queued platform-side: verify scorecard grades KNOWN
+  legs and leaves UNKNOWN legs UNKNOWN when the first envelopes lapse.
+
+## Small bot-side follow-up queued for WEEK 2 (not this week)
+
+- mirror_v7_close does not send mae/mfe though tracked carries them —
+  the platform renders MAE/MFE as UNKNOWN honestly. Append-only fix
+  (two keys in the close payload), worth doing at the week-2 review
+  alongside whatever else that review decides. Not during collection.

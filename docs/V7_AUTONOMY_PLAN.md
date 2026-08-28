@@ -211,3 +211,27 @@ feeds growing ~26k rows/day. Fixes are platform-side: cache evidence
 read models (~60s), add uvicorn workers, bound queries, consider 1m
 retention (e.g. 30d) later. Handover written; measure per-endpoint
 before and after.
+
+## Bot-side rulings on the platform's one-time list (2026-08-29)
+
+- US100 LIVE CANDLES 400: the bridge's map has no USTEC/US100 entry
+  (measured 2026-08-22), so the bridge rejects the platform's "US100".
+  RULING: caller-side fix — the platform requests USTEC for bridge
+  reads (its ingest already canonicalizes USTEC->US100). No Windows
+  deploy needed; the bridge map gains the alias whenever the executor
+  file next ships through the hash/relay process, not before.
+- US10Y CONFLICT (brain push BEARISH vs AssetPulse up). RULING: for
+  MACRO symbols (DXY/US10Y/US30Y/OIL/VIX) the journal-derived bias
+  push is NOT authoritative — it is an echo of whatever old signal
+  context last mentioned the symbol, weak provenance by construction.
+  The authoritative macro direction is the platform's OWN
+  trend_context computed from stored CLOSED candles (reproducible,
+  fresh, already built). Platform: switch the macro strip to
+  trend_context and label journal-derived macro rows "journal echo".
+  Bot side will exclude macro symbols from push_bias in a future
+  tidy-up; not urgent once the strip reads the right source.
+- EARNINGS EVENTS: the FF feed is macro-econ only — earnings need a
+  separate, deliberately chosen source (probe before trust). FUTURE
+  ORGAN, not improvised. Meanwhile a single high-impact earnings event
+  can be posted manually through the same /webhooks/brain/news
+  contract when it matters (authored content, like outlooks).

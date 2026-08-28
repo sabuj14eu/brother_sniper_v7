@@ -157,3 +157,28 @@ expectancy, P/L, R:R, entry_dist_atr bucket, grade, session, structure,
 rejection reason, MAE/MFE where present. Bot-side data already flows
 (capture_reject + telemetry + trades.jsonl, joined by signal_id via
 load_unified).
+
+## Weekend work order (2026-08-29/30) — performance is now a FAULT, not polish
+
+Page timeouts reported on desk/chart. Item 4 (server cleanup) pulls
+forward: a page that times out is broken, not slow. Triage first
+(docker stats + pg table sizes), then the known suspects platform-side:
+composite index candles(symbol,tf,ts) (model has three single-column
+indexes; every candle query scans without the composite), CACHE the
+three v4.52 evidence read models on /desk (funnel + contamination +
+consistency each full-scan lane_observations per page load — bot
+session owns this mistake), LIMIT chart history queries, and verify
+market_status classifies METALS CLOSED on weekends (GOLD showed
+"OPEN 24/5" + candles STALE on a Saturday — if the market clock is
+wrong, every non-crypto page reads falsely stale all weekend).
+
+## "V7 should trade alone, not wait for Pine" — the phased road (no skips)
+
+The destination IS the V7 Self-Dependence Plan; the road has gates:
+Phase 1 Collect (exit: >=200 resolved candidates, every field) ->
+Phase 2 Analyze (the adaptive cells — running) -> Phase 3 Train ->
+Phase 4 SHADOW (auto-v1 candidates decided beside v7, never executed)
+-> Phase 5 controlled deployment = v7 trades without Pine. Check the
+Phase-1 exit gate at this weekend's review via collector.coverage().
+No phase may be skipped; the paper lanes' record is the resume the
+autonomous engine brings to its own job interview.

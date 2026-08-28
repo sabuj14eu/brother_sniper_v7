@@ -235,3 +235,21 @@ before and after.
   ORGAN, not improvised. Meanwhile a single high-impact earnings event
   can be posted manually through the same /webhooks/brain/news
   contract when it matters (authored content, like outlooks).
+
+## THE REVIEW'S TWO NEW QUESTIONS (Shyam's live-trading push, 2026-08-29)
+
+1. AUTO-V1'S OWN VERDICT: per-engine paper record (resolved n, WR,
+   expectancy, total R) from lane_observations. If auto-v1's record is
+   negative, "make it live" dies on evidence. If positive, remember the
+   resolver charges NO COSTS (documented in lane-resolve-v1): no
+   spread, no slippage. A thin paper edge can be a real-money loss —
+   any live decision must survive a spread-cost discount first.
+2. THE AGREEMENT CUT (Shyam's hybrid, half 1): on evaluated
+   DecisionRecords, does Pine perform better when auto-v1 AGREES with
+   the direction vs when it disagrees/waits? If agreement cells show
+   better expectancy at n>=20, "require bot agreement on Pine signals"
+   becomes a proposable GATE TIGHTENING (reduces trades, never widens
+   risk) — still shadow-first, still human-approved.
+Half 2 (bot fires without Pine) remains Phase 5, reachable only through
+a positive cost-discounted record + the execution-path build + explicit
+approval. No live change happens by chat decision on a weekend.

@@ -182,3 +182,32 @@ Phase 4 SHADOW (auto-v1 candidates decided beside v7, never executed)
 Phase-1 exit gate at this weekend's review via collector.coverage().
 No phase may be skipped; the paper lanes' record is the resume the
 autonomous engine brings to its own job interview.
+
+## PHASE 1 EXIT GATE — MET (measured 2026-08-29)
+
+coverage(): resolved_trades = 14,941 against target 200 (74x over),
+33,789 observations across all four engines, spread recorded on
+31,749 rows, vol_ratio on 33,281 — both Phase-1 field gaps CLOSED.
+Phase 1 (Collect) is complete as measured; FORMALIZE at the Friday
+review, then Phase 2 (Analyze) is officially the current phase — the
+adaptive cells, confounder cuts and counterfactuals ARE its work.
+The road to v7-without-Pine now runs: Phase 2 mature -> Phase 3 Train
+(Model Lab, Quant Lab Law) -> Phase 4 SHADOW -> Phase 5 controlled
+deployment. Gates checked, never skipped.
+
+## Perf triage read (2026-08-29) — corrected diagnosis
+
+Measured: candles 957,526 rows / 219 MB; lane_observations 33,789 /
+35 MB; app CPU 0.35% idle, RAM fine; db NET OUT 271 GB cumulative.
+CORRECTION to the earlier guess: the composite candle index already
+exists via UniqueConstraint uq_candle(symbol,tf,ts) — indexing is NOT
+the problem. The signature (idle CPU + timeouts + huge repeated reads)
+points to: (1) a SINGLE app worker (DEPLOYMENT.md's own scaling note),
+so requests queue behind slow ones; (2) the in-process sweeper
+(record_all/resolve_all) periodically occupying that worker; (3) the
+v4.52 desk read models full-scanning lane_observations three times per
+page view, uncached; (4) unbounded chart/radar candle pulls, with 1m
+feeds growing ~26k rows/day. Fixes are platform-side: cache evidence
+read models (~60s), add uvicorn workers, bound queries, consider 1m
+retention (e.g. 30d) later. Handover written; measure per-endpoint
+before and after.

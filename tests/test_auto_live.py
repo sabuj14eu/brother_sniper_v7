@@ -133,3 +133,17 @@ def test_scenario_wait_states_carry_reasons():
     assert short["state"] == WAIT and "history" in short["missing_confirmation"][0]
     # UNKNOWN stays UNKNOWN — never manufactured
     assert "UNKNOWN" in far["macro_context"] and "UNKNOWN" in far["event_phase"]
+
+
+def test_scenario_carries_its_own_clock():
+    """as_of = last closed bar's close, ISO UTC — the platform rejects a
+    state without it by name (Freshness Law)."""
+    now = time.time()
+    rows = _rows(now=now)
+    rec = scenario("SILVER", rows, 3.0, now=now)
+    closed_end = max(float(r["time"]) for r in rows
+                     if float(r["time"]) + 900 <= now) + 900
+    assert rec["as_of"] == time.strftime("%Y-%m-%dT%H:%M:%S+00:00",
+                                         time.gmtime(closed_end))
+    short = scenario("SILVER", [], 3.0, now=now)
+    assert short["as_of"]                        # even empty states carry a clock

@@ -157,8 +157,11 @@ def scenario(sym, rows, max_dist_atr, now=None):
     Missing feeds (event phase, macro) say UNKNOWN — never manufactured."""
     now = now or time.time()
     closed = [r for r in rows if r.get("time") and float(r["time"]) + TF_MIN * 60 <= now]
+    # as_of = the state's OWN clock (last closed bar's close), Freshness Law
+    as_of = float(closed[-1]["time"]) + TF_MIN * 60 if closed else now
     rec = {"scenario_id": f"SC2-{sym}-{int(float(closed[-1]['time'])) if closed else int(now)}",
            "symbol": sym, "tf": str(TF_MIN), "ts": now,
+           "as_of": time.strftime("%Y-%m-%dT%H:%M:%S+00:00", time.gmtime(as_of)),
            "pine_dependency": "NONE",
            "event_phase": "UNKNOWN (event feed not wired into scenario v1)",
            "macro_context": "UNKNOWN (never manufactured)",
@@ -221,6 +224,24 @@ def scenario(sym, rows, max_dist_atr, now=None):
     return rec
 
 
+def _post_scenario(rec):
+    """State change -> platform 🎬 card. Best-effort, never blocks the run;
+    the box is never scraped — this push is the only transport. Path is
+    env-overridable in case the platform named the ingest differently."""
+    url, secret = _env("PLATFORM_WEBHOOK_URL"), _env("PLATFORM_WEBHOOK_SECRET")
+    if not url or not secret:
+        return
+    path = _env("V7_SCENARIO_WEBHOOK_PATH", "/webhooks/brain/scenario")
+    try:
+        req = urllib.request.Request(
+            f"{url.rstrip('/')}{path}", data=json.dumps(rec).encode(),
+            headers={"Content-Type": "application/json", "X-Brain-Secret": secret})
+        with urllib.request.urlopen(req, timeout=10):
+            pass
+    except Exception as e:
+        print(f"scenario post failed (non-fatal): {type(e).__name__}: {e}")
+
+
 def _state():
     try:
         with open(STATE_F, encoding="utf-8") as f:
@@ -262,6 +283,7 @@ def main() -> int:
             with open(SCEN_LOG, "a", encoding="utf-8") as f:
                 f.write(json.dumps(rec) + "\n")
             state[f"scen:{sym}"] = cur
+            _post_scenario(rec)
         c, why = candidate(rows, max_dist, now)
         if c is None:
             print(f"{sym}: {why}")

@@ -284,3 +284,20 @@ What shipped for it (all read-only or dry-run):
   and bar_ts, so replay needs no new capture. §11 is conditional_profile.
 - §12 is Friday's question, answered from this week's record only; any
   UNKNOWN keeps the verdict at SHADOW. AUTO_LIVE_ARM=1 stays a human act.
+
+## NEWS SEMANTIC ENGINE v1 (Shyam's order, 2026-08-31) — CONTEXT, NEVER SIGNAL
+
+filters/news_semantic.py: NEWS -> EVENT CLASS -> SURPRISE -> STANCE ->
+PRESSURE MAP, embedded in every scenario record; price keeps the final
+vote and v7's hard news gate is untouched. Laws pinned by test:
+numbers beat words (wording never sets surprise when actual+forecast
+exist); inverted series (unemployment, jobless) carry explicit polarity;
+non-USD pressure = UNKNOWN in v1; two opposite-stance in-window events =
+CONFLICTING NEWS, no direction forced; agreement() declares
+CONFIRMED / ⚠ CONFLICT — WAIT between news pressure and price bias.
+Phases PRE-EVENT/INITIAL/STRUCTURE/RETEST/POST-NEWS from event minutes.
+Feed = the same FF calendar bot.py's gate already fetches; no new feed.
+Learning: scenario records now carry event_class/surprise/phase, so
+conditional_profile's cells (GOLD + HOT PCE + NY + WITH-TREND ...) accrue
+from the same journal; no learned edge is claimed under the floor.
+AI's role stays explanation-only; nothing in this engine places trades.

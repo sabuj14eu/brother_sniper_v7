@@ -151,10 +151,27 @@ def candidate(rows, max_dist_atr, now=None):
 WAIT, FRESH_BLOCK = "⚪ WAIT", "⛔ DATA FRESHNESS"
 
 
-def scenario(sym, rows, max_dist_atr, now=None):
+def _fetch_calendar():
+    """FF calendar, high-impact rows — the same feed bot.py's gate uses.
+    Cloudflare rejects urllib's default UA, so requests or nothing;
+    nothing -> the scenario honestly says UNKNOWN."""
+    try:
+        import requests
+        r = requests.get("https://nfs.faireconomy.media/ff_calendar_thisweek.json",
+                         timeout=5)
+        if r.status_code == 200:
+            return [e for e in r.json() if str(e.get("impact", "")).lower() == "high"]
+    except Exception:
+        pass
+    return None
+
+
+def scenario(sym, rows, max_dist_atr, now=None, events=None):
     """Full autonomous scenario record for one symbol, every run.
     pine_dependency is NONE by construction: nothing here reads Pine.
-    Missing feeds (event phase, macro) say UNKNOWN — never manufactured."""
+    Missing feeds (event phase, macro) say UNKNOWN — never manufactured.
+    News semantics are CONTEXT ONLY: they never gate; v7's own hard news
+    gate still rules the actual fire downstream."""
     now = now or time.time()
     closed = [r for r in rows if r.get("time") and float(r["time"]) + TF_MIN * 60 <= now]
     # as_of = the state's OWN clock (last closed bar's close), Freshness Law
@@ -168,6 +185,19 @@ def scenario(sym, rows, max_dist_atr, now=None):
            "freshness": "OK", "state": WAIT, "bias": "UNKNOWN",
            "missing_confirmation": [], "invalidation": None,
            "next_thing_to_watch": None, "current_state": None}
+    if events is not None:
+        try:
+            from filters.news_semantic import agreement, news_context
+            from datetime import datetime, timezone
+            ctx = news_context(events, sym,
+                               datetime.fromtimestamp(now, tz=timezone.utc))
+            if ctx:
+                rec["event_phase"] = ctx["event_phase"]
+                rec["news"] = ctx
+            else:
+                rec["event_phase"] = "NORMAL"
+        except Exception as e:                   # semantics must never sink a run
+            rec["event_phase"] = f"UNKNOWN (semantic error: {type(e).__name__})"
     if len(closed) < MIN_BARS:
         rec["missing_confirmation"] = [f"history ({len(closed)}/{MIN_BARS} closed bars)"]
         rec["current_state"] = "INSUFFICIENT HISTORY"
@@ -195,6 +225,14 @@ def scenario(sym, rows, max_dist_atr, now=None):
     dist = abs(last["c"] - level) / a
     risk = abs(level - sl)
     rr = round(abs(tp - level) / risk, 2) if risk else 0
+    if isinstance(rec.get("news"), dict):
+        try:
+            from filters.news_semantic import agreement
+            rec["news_price_agreement"] = agreement(
+                rec["news"]["symbol_pressure"],
+                "bullish" if d == "BUY" else "bearish")
+        except Exception:
+            rec["news_price_agreement"] = "UNKNOWN"
     rec.update(bias=f"{'bullish' if d == 'BUY' else 'bearish'} ({st})",
                key_level=round(level, 5), entry=round(level, 5),
                sl=round(sl, 5), tp=round(tp, 5), rr=rr,
@@ -267,6 +305,7 @@ def main() -> int:
     armed = _env("AUTO_LIVE_ARM", "0").lower() in ("1", "true", "yes")
     state = _state()
     now = time.time()
+    events = _fetch_calendar()                    # None -> UNKNOWN, never faked
     for sym in symbols:
         try:
             with urllib.request.urlopen(
@@ -276,7 +315,7 @@ def main() -> int:
         except Exception as e:
             print(f"{sym}: candle fetch failed: {e}")
             continue
-        rec = scenario(sym, rows, max_dist, now)
+        rec = scenario(sym, rows, max_dist, now, events=events)
         prev = state.get(f"scen:{sym}")
         cur = f"{rec['state']}@{rec.get('key_level')}"
         if cur != prev:                       # log transitions, not heartbeats

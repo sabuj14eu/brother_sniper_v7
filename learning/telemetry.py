@@ -46,7 +46,14 @@ _SCHEMA_GROUPS = {
                # value, so the n>=20-30 per bucket clock starts now.
                "entry_dist_atr"],
     "structure": ["bos", "choch", "fvg", "liquidity_sweep", "order_block",
-                  "zone", "htf_align", "setup_type", "strategy_id"],
+                  "zone", "htf_align", "setup_type", "strategy_id",
+                  # 08-31 APPEND-ONLY: Pine v18.13 emits its own structure
+                  # read ("HH/HL" | "LH/LL" | "MIXED") — the SAME three words
+                  # auto-live-v1 emits. Captured verbatim so the agreement cut
+                  # (does Pine do better when the bot agrees?) becomes a join
+                  # instead of an inference; this week it was CANNOT SEPARATE
+                  # at n=7/14. Forward-only: the clock starts at the ceremony.
+                  "pine_structure"],
     "ai": ["grade", "ai_score", "pine_score", "council_votes", "confidence",
            "reject_reason"],
     "timing": ["signal_time", "v7_receive_time", "send_time",
@@ -119,6 +126,8 @@ def capture_reject(payload: dict, status: str, reason: str) -> None:
             zone=payload.get("zone") or payload.get("loc_zone"),
             setup_type=payload.get("type"),
             grade=payload.get("grade"), pine_score=payload.get("score"),
+            pine_version=payload.get("pine_ver") or payload.get("version"),
+            pine_structure=payload.get("structure"),
             reject_reason=reason,
         )
         row["strategy_id"] = classify(payload)

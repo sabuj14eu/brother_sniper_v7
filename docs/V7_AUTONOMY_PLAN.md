@@ -253,3 +253,34 @@ before and after.
 Half 2 (bot fires without Pine) remains Phase 5, reachable only through
 a positive cost-discounted record + the execution-path build + explicit
 approval. No live change happens by chat decision on a weekend.
+
+## WEEK-2 AUTONOMY COLLECTION (Shyam's order, 2026-08-31) — SHADOW STAYS SHADOW
+
+The weekend report proved auto_live GENERATES without Pine; Week-2 must
+prove the whole lifecycle THINKS without Pine. Execution stays unarmed.
+What shipped for it (all read-only or dry-run):
+
+- SCENARIO RECORD (§1/2/5): auto_live.scenario() now logs every state
+  transition per symbol to logs/auto_scenarios.jsonl — ⚪ WAIT /
+  🟡 DEVELOPING / 🟢 BUY READY / 🔴 SELL READY / ⛔ DATA FRESHNESS —
+  each with bullish_condition, bearish_condition, missing_confirmation,
+  invalidation, next_thing_to_watch, and pine_dependency=NONE by
+  construction. Event phase and macro context are recorded as UNKNOWN
+  until their feeds are wired — never manufactured. candidate() remains
+  the sole firing authority; tests pin scenario↔candidate equivalence.
+- MGMT REPLAY (§6): mgmt_replay.py compares ENTRY-ONLY vs BREAKEVEN+1R
+  from recorded MAE/MFE with honest BEST/WORST bounds (sampled extremes
+  cannot order events). TP1/trail/runner/news-aware = UNKNOWN: they need
+  the price path the monitor does not record. SL MAY ONLY TIGHTEN.
+- STATE AUDIT (§7): audit_mgmt_state.py — required zeros:
+  closed_reactivated, double_close, partial_fired, sl_wrong_side,
+  negative_excursion, widen_guard_missing (verifies bot.py's _tighter
+  line still stands). Writes logs/mgmt_audit_last.json for the scorecard.
+- DAILY SCORECARD (§8): autonomy_scorecard.py prints the §8 counts from
+  the bot's own logs and --post ships them to the platform as kind:"doc"
+  path AUTONOMY_SCORECARD_<date>.md (same artifact webhook as readiness).
+- §9/§10 (missed opportunities, gate counterfactuals) ride the platform's
+  truth layer over the scenario log — every WAIT carries level, distance
+  and bar_ts, so replay needs no new capture. §11 is conditional_profile.
+- §12 is Friday's question, answered from this week's record only; any
+  UNKNOWN keeps the verdict at SHADOW. AUTO_LIVE_ARM=1 stays a human act.

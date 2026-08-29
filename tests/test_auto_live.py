@@ -93,3 +93,43 @@ def test_mixed_structure_refuses():
         rows[i]["l"] -= 3.0
     c, why = candidate(rows, 3.0, now=now)
     assert c is None
+
+# ── Week-2: scenario record (the decision even when it is WAIT) ──
+
+from auto_live import FRESH_BLOCK, WAIT, scenario
+
+
+def test_scenario_agrees_with_candidate_on_ready():
+    now = time.time()
+    rows = _rows(now=now)
+    r_low = min(r["l"] for r in rows[-LOOKBACK:])
+    rows2 = _rows(now=now, last_low=r_low - 0.01)
+    rec = scenario("SILVER", rows2, 3.0, now=now)
+    c, why = candidate(rows2, 3.0, now=now)
+    assert rec["state"] == "🟢 BUY READY" and why is None
+    assert rec["entry"] == c["entry"] and rec["sl"] == c["sl"]
+    assert rec["pine_dependency"] == "NONE"
+
+
+def test_scenario_developing_when_not_touched():
+    now = time.time()
+    rec = scenario("SILVER", _rows(now=now), 3.0, now=now)
+    assert rec["state"] == "🟡 BUY DEVELOPING"
+    assert rec["missing_confirmation"] and rec["invalidation"]
+    assert candidate(_rows(now=now), 3.0, now=now)[0] is None
+
+
+def test_scenario_wait_states_carry_reasons():
+    now = time.time()
+    stale = scenario("GOLD", _rows(now=now - 5 * 900), 3.0, now=now)
+    assert stale["state"] == FRESH_BLOCK and stale["freshness"] != "OK"
+    rows = _rows(now=now)
+    rows[-1]["c"] += 10.0
+    rows[-1]["h"] += 10.3
+    far = scenario("GOLD", rows, 3.0, now=now)
+    assert far["state"] == WAIT and "far" in far["current_state"]
+    assert far["next_thing_to_watch"]
+    short = scenario("GOLD", _rows(n=10, now=now), 3.0, now=now)
+    assert short["state"] == WAIT and "history" in short["missing_confirmation"][0]
+    # UNKNOWN stays UNKNOWN — never manufactured
+    assert "UNKNOWN" in far["macro_context"] and "UNKNOWN" in far["event_phase"]

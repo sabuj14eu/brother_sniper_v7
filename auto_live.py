@@ -48,6 +48,7 @@ import urllib.request
 DIR = os.path.dirname(os.path.abspath(__file__))
 STATE_F = os.path.join(DIR, "logs", "auto_live_state.json")
 DRY_LOG = os.path.join(DIR, "logs", "auto_live.jsonl")
+SCEN_LOG = os.path.join(DIR, "logs", "auto_scenarios.jsonl")
 WEBHOOK = "http://127.0.0.1:5000/webhook"
 TF_MIN = 15
 LOOKBACK = 40                    # platform auto-v1 structural window
@@ -143,6 +144,83 @@ def candidate(rows, max_dist_atr, now=None):
             "bar_ts": bar_ts, "level": round(level, 5)}, None
 
 
+# ── Week-2 (2026-08-31): conditional scenario record — the DECISION even
+# when the decision is WAIT. Same math as candidate(); candidate() stays
+# the sole firing authority and tests pin their equivalence. ──
+
+WAIT, FRESH_BLOCK = "⚪ WAIT", "⛔ DATA FRESHNESS"
+
+
+def scenario(sym, rows, max_dist_atr, now=None):
+    """Full autonomous scenario record for one symbol, every run.
+    pine_dependency is NONE by construction: nothing here reads Pine.
+    Missing feeds (event phase, macro) say UNKNOWN — never manufactured."""
+    now = now or time.time()
+    closed = [r for r in rows if r.get("time") and float(r["time"]) + TF_MIN * 60 <= now]
+    rec = {"scenario_id": f"SC2-{sym}-{int(float(closed[-1]['time'])) if closed else int(now)}",
+           "symbol": sym, "tf": str(TF_MIN), "ts": now,
+           "pine_dependency": "NONE",
+           "event_phase": "UNKNOWN (event feed not wired into scenario v1)",
+           "macro_context": "UNKNOWN (never manufactured)",
+           "freshness": "OK", "state": WAIT, "bias": "UNKNOWN",
+           "missing_confirmation": [], "invalidation": None,
+           "next_thing_to_watch": None, "current_state": None}
+    if len(closed) < MIN_BARS:
+        rec["missing_confirmation"] = [f"history ({len(closed)}/{MIN_BARS} closed bars)"]
+        rec["current_state"] = "INSUFFICIENT HISTORY"
+        return rec
+    if now - float(closed[-1]["time"]) > TF_MIN * 60 * 3:
+        rec.update(state=FRESH_BLOCK, freshness="STALE >3 bars",
+                   current_state="DECISION BLOCKED — DATA FRESHNESS",
+                   next_thing_to_watch="candle feed recovering")
+        return rec
+    a, st = atr(closed), structure_state(closed)
+    if not a or st not in ("HH/HL", "LH/LL"):
+        rec.update(bias="mixed" if st == "MIXED" else "UNKNOWN",
+                   current_state="NEITHER CONFIRMED",
+                   missing_confirmation=["structure (HH/HL or LH/LL)"],
+                   next_thing_to_watch="two rising or two falling swing pairs")
+        return rec
+    win = closed[-LOOKBACK:]
+    r_high, r_low = max(c["h"] for c in win), min(c["l"] for c in win)
+    last = closed[-1]
+    d = "BUY" if st == "HH/HL" else "SELL"
+    level = r_low if d == "BUY" else r_high
+    sl = level - SL_ATR * a if d == "BUY" else level + SL_ATR * a
+    tp = r_high if d == "BUY" else r_low
+    touched = last["l"] <= level if d == "BUY" else last["h"] >= level
+    dist = abs(last["c"] - level) / a
+    risk = abs(level - sl)
+    rr = round(abs(tp - level) / risk, 2) if risk else 0
+    rec.update(bias=f"{'bullish' if d == 'BUY' else 'bearish'} ({st})",
+               key_level=round(level, 5), entry=round(level, 5),
+               sl=round(sl, 5), tp=round(tp, 5), rr=rr,
+               entry_dist_atr=round(dist, 2),
+               bullish_condition=f"closed 15m bar touches {round(r_low, 5)} with HH/HL intact, RR≥{MIN_RR}",
+               bearish_condition=f"closed 15m bar touches {round(r_high, 5)} with LH/LL intact, RR≥{MIN_RR}",
+               invalidation=f"structure flip away from {st}, or level beyond {max_dist_atr} ATR")
+    if dist > max_dist_atr:
+        rec.update(current_state="LEVEL TOO FAR — the measured far-bucket bleed",
+                   missing_confirmation=[f"price within {max_dist_atr} ATR of level (now {dist:.2f})"],
+                   next_thing_to_watch=f"price returning toward {round(level, 5)}")
+        return rec
+    if touched and rr >= MIN_RR:
+        rec.update(state=f"{'🟢' if d == 'BUY' else '🔴'} {d} READY",
+                   current_state=f"{d} SETUP VALID — level touched, structure intact",
+                   next_thing_to_watch="v7 hard gates (news, slots, sizing) on fire")
+        return rec
+    if touched:
+        rec.update(current_state=f"touched but RR {rr} < {MIN_RR}",
+                   missing_confirmation=[f"R:R ≥ {MIN_RR}"],
+                   next_thing_to_watch="range extending to restore R:R")
+        return rec
+    rec.update(state=f"🟡 {d} DEVELOPING",
+               current_state=f"NEITHER CONFIRMED — {d} bias, awaiting touch",
+               missing_confirmation=[f"touch of {round(level, 5)} on a closed 15m bar"],
+               next_thing_to_watch=f"15m closing near {round(level, 5)}")
+    return rec
+
+
 def _state():
     try:
         with open(STATE_F, encoding="utf-8") as f:
@@ -177,6 +255,13 @@ def main() -> int:
         except Exception as e:
             print(f"{sym}: candle fetch failed: {e}")
             continue
+        rec = scenario(sym, rows, max_dist, now)
+        prev = state.get(f"scen:{sym}")
+        cur = f"{rec['state']}@{rec.get('key_level')}"
+        if cur != prev:                       # log transitions, not heartbeats
+            with open(SCEN_LOG, "a", encoding="utf-8") as f:
+                f.write(json.dumps(rec) + "\n")
+            state[f"scen:{sym}"] = cur
         c, why = candidate(rows, max_dist, now)
         if c is None:
             print(f"{sym}: {why}")
@@ -194,6 +279,7 @@ def main() -> int:
                    "tp1": c["tp1"], "rr": c["rr"], "atr": c["atr"],
                    "structure": c["structure"],
                    "entry_dist_atr": c["entry_dist_atr"],
+                   "pine_dependency": "NONE",
                    "time": c["bar_ts"]}
         with open(DRY_LOG, "a", encoding="utf-8") as f:
             f.write(json.dumps({"armed": armed, "posted_at": now, **payload}) + "\n")

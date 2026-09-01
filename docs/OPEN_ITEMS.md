@@ -50,3 +50,31 @@ BRANCH NOTE: all fixes are committed to claude/evidence-integrity-audit-
   (single-file checkouts Shyam pastes) all fetch from this one branch;
   splitting it would break his pastes and cost him tokens. Same tests,
   same ceremony, one branch.
+
+## ROUND 2 STATUS (2026-09-02 follow-up order)
+
+1. C1: THE AUDITOR WAS RIGHT — my refutation read a truncated view and
+   missed bot.py:285 (raw Pine id as dedup key when present; Pine ids
+   carry no symbol). Fixed test-first: key is now symbol:signal_id
+   (patch_dedup_symbol.py; test_round2_guards.py::test_c1_* — two symbols
+   same id both trade, same-symbol duplicate still refused, fallback
+   unchanged). Lesson recorded: never refute from a partial read.
+2. A2: repo bot.py now carries the XFF guard IN THE FILE — every patch
+   family (truth guards v1+v2, pine_structure, dedup, freshness, mirror
+   close) is applied to the repo copy, so the pushed branch shows what
+   the box runs. Box deploy stays via the idempotent patch scripts.
+3. WINDOWS: ceremony paste issued this round (below in chat) for
+   patch_executor_positions.py (A1 503) on SniperExecutorV7 and the B5
+   two-witness main.py on SniperExecutorV18. Git green != live until run.
+4. A1 CONFIRMED: test_round2_guards.py::
+   test_a1_unverified_close_increments_no_loss drives the patched
+   accounting verbatim — deal=None: consecutive_losses and total_losses
+   UNCHANGED, tag UNVERIFIED; real loss still counts; win still resets.
+5. B5 DONE (brain repo): two fresh 24/7 witnesses must agree or /candles
+   refuses 503, utc_normalized never false-claimed
+   (executor_ic_markets/tests/test_clock_offset.py, 4 tests).
+   B2 DONE (brain repo): shared fcntl lock writer+backfill, importable
+   run_backfill, race regression test (concurrent append survives);
+   hourly cron in the deploy paste.
+6. PROCESS: merging the deploy branch to main in both repos at the end of
+   this round, per the order — no future audit diffs a dead branch.

@@ -282,7 +282,9 @@ discipline   = DisciplineGovernor()
 
 # ━━ Dedup ──────────────────────────━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 def _make_sid(p):
-    if p.get("signal_id"): return str(p["signal_id"])
+    # [C1 2026-09-02] Pine ids carry no symbol -> same-bar cross-symbol
+    # collision dropped the second trade. Symbol-prefix the key.
+    if p.get("signal_id"): return f"{p.get('symbol','')}:{p['signal_id']}"
     return hashlib.sha256(f"{p.get('symbol','')}-{p.get('direction','')}-{round(float(p.get('entry',0)),2)}".encode()).hexdigest()[:16]
 
 def _is_dup(sid):
@@ -429,7 +431,10 @@ def _monitor():
                 _base=os.getenv("EXECUTOR_URL","").replace("/execute","")
                 try:
                     _r=_rq.get(_base+"/positions",timeout=5)
-                    _poslist=_r.json().get("positions",[])
+                    _pj=_r.json()
+                    if _r.status_code!=200 or "positions" not in _pj:
+                        log.warning(f"[MON] positions UNKNOWN (HTTP {_r.status_code}) — closed!=unreachable, skipping cycle"); continue
+                    _poslist=_pj.get("positions") or []
                     _tickets={p.get("ticket") for p in _poslist}
                     _posmap={p.get("ticket"):p for p in _poslist}
                 except Exception as _e:
@@ -510,7 +515,14 @@ def _monitor():
                         close_reason=deal.get("close_comment","").lower()
                         log.info(f"[MON] {ac}/{tracked.get('symbol','?')} {oid} closed: close={cp} profit={profit} reason={close_reason}")
                     else:
-                        log.warning(f"[MON] Trade {oid} ({ac}/{tracked.get('symbol','?')}) not in history yet — using entry as fallback")
+                        # [TRUTH-GUARD 08-31] missing deal = UNKNOWN, not a $0 close
+                        _miss=int(tracked.get("_hist_miss") or 0)+1
+                        tracked["_hist_miss"]=_miss; set_open_trade(ac, tracked)
+                        if _miss<10:
+                            log.warning(f"[MON] {oid} gone from positions but NOT in history (miss {_miss}/10) — holding slot, not closing")
+                            continue
+                        log.error(f"[MON] {oid} absent {_miss} cycles — UNVERIFIED fallback close at entry")
+                        send_telegram(f"\u26a0\ufe0f <b>UNVERIFIED close</b>\n{tracked.get('symbol')} <code>{oid}</code>\nNo deal in /history after {_miss} checks — journaled at entry, VERIFY AT BROKER.")
                     # Compute hold time
                     _hold=None
                     try:
@@ -523,6 +535,7 @@ def _monitor():
                     clear_open_trade(ac)
                     state["total_trades"]=state.get("total_trades",0)+1
                     if won: state["consecutive_losses"]=0; state["total_wins"]=state.get("total_wins",0)+1; emoji,tag="✅",f"WIN +${net:.2f}"
+                    elif deal is None: emoji,tag="❓",f"UNVERIFIED ${net:.2f}"  # [TRUTH-GUARD-V2 09-02] unknown outcome is never a loss: no streak, no loss count
                     else: state["consecutive_losses"]=state.get("consecutive_losses",0)+1; state["total_losses"]=state.get("total_losses",0)+1; emoji,tag="❌",f"LOSS ${net:.2f}"
                     # ── [MAE-LIVE]: use excursion accumulated by the monitor loop ──
                     _mae=tracked.get("mae"); _mfe=tracked.get("mfe")
@@ -530,6 +543,12 @@ def _monitor():
                     mem_close(tracked.get("signal_id","?"), float(cp), profit, swap, comm, hold_time_seconds=_hold, mae=_mae, mfe=_mfe,
                               be_done=bool(tracked.get("be_done")), partial_done=bool(tracked.get("partial_done")))
                     equity_guard.record_trade(net, tracked["symbol"])
+                    # ── [08-22] platform mirror: trade OUTCOME, fire-and-forget.
+                    try:
+                        from learning.platform_mirror import mirror_v7_close
+                        mirror_v7_close(tracked, net, won, close_price=float(cp), hold_seconds=_hold)
+                    except Exception as _pm:
+                        log.warning(f"[MIRROR] close skipped (non-fatal): {_pm}")
                     state["equity"]=equity_guard.to_dict(); save_state()
                     bal=xtb.get_balance(); equity_guard.update_balance(bal)
 
@@ -574,7 +593,11 @@ def _calibration_worker():
 @app.before_request
 def _guard():
     if request.path=="/health": return
-    ip=(request.headers.get("X-Forwarded-For",request.remote_addr) or "").split(",")[0].strip()
+    _ra=request.remote_addr or ""
+    if _ra in ("127.0.0.1","::1"):
+        ip=(request.headers.get("X-Forwarded-For") or _ra).split(",")[0].strip()
+    else:
+        ip=_ra  # [TRUTH-GUARD 08-31] XFF is attacker-controlled unless our own nginx set it
     if not _ip_ok(ip): abort(403)
     if not _rate_ok(ip): abort(429)
 
@@ -963,6 +986,26 @@ def handle_signal(payload: dict, raw_body: bytes = b"") -> dict:
     log.info(f"[CLUSTER-RISK] {symbol} cluster_n={_cn} scale={_cluster_scale} -> risk={effective_risk*100:.3f}%")
     lot,_=calc_lot(symbol,entry,inst_sl,balance,effective_risk)
 
+    # ── [08-22 FRESHNESS GATE v1 — autonomy stage 2, SHADOW default] A
+    # stale evaluation is never authoritative. Shadow logs what it WOULD
+    # block; only V7_FRESHNESS_GATE=enforce (explicit human decision,
+    # after shadow evidence n>=20) makes it real. Fully guarded. ──
+    try:
+        from filters.freshness_gate import gate_from_env as _fg_eval
+        _fg = _fg_eval(signal_age_s=signal_age_seconds_v)
+        if _fg["blocked"]:
+            log.warning(f"[FRESH-GATE {_fg['mode'].upper()}] {symbol} {direction} "
+                        f"{_fg['state']}: {_fg['reason']}")
+            try:
+                from learning.telemetry import capture_reject
+                capture_reject(payload, f"freshness_{_fg['mode']}", _fg["reason"])
+            except Exception: pass
+            if _fg["mode"] == "enforce":
+                return {"status":"blocked",
+                        "msg":f"DECISION BLOCKED — DATA FRESHNESS: {_fg['reason']}"}
+    except Exception as _fge:
+        log.warning(f"[FRESH-GATE] skipped (non-fatal): {_fge}")
+
     # ── Execute ───────────────────────────────────────────────────────────────
     try:
         xtb.ensure_connected()
@@ -1049,6 +1092,7 @@ def handle_signal(payload: dict, raw_body: bytes = b"") -> dict:
                     # so the column means ONE thing). Log-only, like every
                     # field in this block — the trade is already placed.
                     entry_dist_atr=payload.get("entry_dist_atr"),
+                    pine_structure=payload.get("structure"),
                     zone=payload.get("zone") or payload.get("loc_zone"),
                     setup_type=payload.get("type"), htf_align=htf_trend,
                     strategy_id=__import__("learning.strategy_dna", fromlist=["classify"]).classify(payload),

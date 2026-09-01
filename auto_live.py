@@ -312,6 +312,12 @@ def main() -> int:
                     f"{base.rstrip('/')}/candles?symbol={sym}&tf={TF_MIN}&n=120",
                     timeout=10) as r:
                 rows = (json.loads(r.read().decode()) or {}).get("rows") or []
+                # bridge builds differ: some serve o/h/l/c, some open/high/low/close,
+                # some t instead of time — normalize once, never guess later
+                rows = [{"time": x.get("time", x.get("t")),
+                         "o": x.get("o", x.get("open")), "h": x.get("h", x.get("high")),
+                         "l": x.get("l", x.get("low")), "c": x.get("c", x.get("close"))}
+                        for x in rows]
         except Exception as e:
             print(f"{sym}: candle fetch failed: {e}")
             continue

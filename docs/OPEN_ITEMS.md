@@ -78,3 +78,25 @@ BRANCH NOTE: all fixes are committed to claude/evidence-integrity-audit-
    hourly cron in the deploy paste.
 6. PROCESS: merging the deploy branch to main in both repos at the end of
    this round, per the order — no future audit diffs a dead branch.
+
+## WINDOWS DEPLOY — COMPLETED 2026-09-02 (the "git green != live" gap CLOSED)
+
+Deployed by Shyam via deploy_windows.py from the fresh C:\brother_sniper_v7
+clone (the VPS now has a real git path for v7 work; V18's old remote
+brother-executor-v18.git is DEAD — repository not found — and its four
+locally-modified files were snapshot-committed as 1baa72a BEFORE anything
+was touched, so the box's unique work is protected and rollbackable).
+
+  A1  C:\Users\Administrator\sniper_executor.py  PATCHED (backup .bak.20260901191923)
+  B5  C:\brother_v18\executor_ic_markets\src\main.py PATCHED + clock_witness.py written
+  Services SniperExecutorV7 and SniperExecutorV18 restarted clean.
+
+Acceptance evidence arrives on its own: next MT5 hiccup -> v7 log shows
+"positions UNKNOWN (HTTP 503)" instead of fake $0 closes; /candles under
+clock doubt refuses with a witness message instead of assuming offset 0.
+Friday round verifies both in live logs.
+
+STILL OPEN on V18: the box repo's remote is dead and its snapshot lives
+only on the box. Decide later (Shyam): create a real GitHub repo for the
+v18 executor and push 1baa72a, or fold it into brother-brain-v2 — until
+then that snapshot has no off-box copy.

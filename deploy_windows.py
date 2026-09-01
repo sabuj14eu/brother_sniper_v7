@@ -126,6 +126,74 @@ def apply(path, edits, marker, dry=False):
     return True
 
 
+OBS_V7_ROUTE = '@app.route("/health", methods=["GET"])'
+OBS_V7_IDENT = (
+    "# [OBS 2026-09-02] identity for the Git<->Production MATCH light.\n"
+    "def _deploy_commit():\n"
+    "    try:\n"
+    "        import subprocess as _sp, os as _os\n"
+    "        return _sp.run([\"git\", \"-C\", _os.path.dirname(_os.path.abspath(__file__)),\n"
+    "                        \"rev-parse\", \"--short\", \"HEAD\"],\n"
+    "                       capture_output=True, text=True, timeout=5).stdout.strip() or \"untracked\"\n"
+    "    except Exception:\n"
+    "        return \"untracked\"\n"
+    "\n"
+    "\n"
+    "_GIT_COMMIT = _deploy_commit()\n"
+    "\n"
+    "\n")
+OBS_V7_OLD = '        return jsonify({"status":"ok","account":acc.login,"balance":acc.balance,"equity":acc.equity})'
+OBS_V7_NEW = '        return jsonify({"status":"ok","account":acc.login,"balance":acc.balance,"equity":acc.equity,"git_commit":_GIT_COMMIT,"service_version":"sniper-executor-v7"})'
+
+OBS_V18_ROUTE = '@app.get("/health")'
+OBS_V18_IDENT = (
+    "# [OBS 2026-09-02] identity for the Git<->Production MATCH light\n"
+    "def _deploy_commit():\n"
+    "    try:\n"
+    "        import subprocess\n"
+    "        return subprocess.run([\"git\", \"-C\", str(_ROOT), \"rev-parse\", \"--short\", \"HEAD\"],\n"
+    "                              capture_output=True, text=True, timeout=5).stdout.strip() or \"untracked\"\n"
+    "    except Exception:\n"
+    "        return \"untracked\"\n"
+    "\n"
+    "\n"
+    "_GIT_COMMIT = _deploy_commit()\n"
+    "\n"
+    "\n"
+    "def _pnl_pct_today():\n"
+    "    \"\"\"[B6] Today's realized P/L as % of balance. None on ANY doubt —\n"
+    "    a daily-loss watchdog must never read silence as safety.\"\"\"\n"
+    "    try:\n"
+    "        import MetaTrader5 as mt5\n"
+    "        acc = mt5.account_info()\n"
+    "        if not acc or not acc.balance:\n"
+    "            return None\n"
+    "        day0 = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)\n"
+    "        deals = mt5.history_deals_get(day0, datetime.now(timezone.utc))\n"
+    "        if deals is None:\n"
+    "            return None\n"
+    "        pnl = sum((d.profit + d.swap + d.commission) for d in deals)\n"
+    "        return round(pnl / acc.balance * 100.0, 3)\n"
+    "    except Exception:\n"
+    "        return None\n"
+    "\n"
+    "\n")
+OBS_V18_OLD = ('        "trades_today": _state.trades_today,\n'
+               '        "balance": _mt5.account_balance(),\n'
+               '    }\n'
+               '\n'
+               '\n'
+               '@app.get("/positions")')
+OBS_V18_NEW = ('        "trades_today": _state.trades_today,\n'
+               '        "balance": _mt5.account_balance(),\n'
+               '        "pnl_pct_today": _pnl_pct_today(),\n'
+               '        "git_commit": _GIT_COMMIT, "service_version": "executor-ic-markets",\n'
+               '    }\n'
+               '\n'
+               '\n'
+               '@app.get("/positions")')
+
+
 def main():
     dry = "--dry-run" in sys.argv
     print("A1 — v7 executor /positions must not lie about a dead MT5")
@@ -143,12 +211,22 @@ def main():
     ok2 = apply(V18, [("candles clock block", B5_OLD, B5_NEW)],
                 "clock unverifiable", dry)
 
+    print("OBS — /health identity (git_commit + service_version), B6 pnl_pct_today")
+    ok3 = apply(V7, [("v7 health route", OBS_V7_ROUTE, OBS_V7_IDENT + OBS_V7_ROUTE),
+                     ("v7 health fields", OBS_V7_OLD, OBS_V7_NEW)],
+                "[OBS 2026-09-02]", dry)
+    ok4 = apply(V18, [("v18 health route", OBS_V18_ROUTE, OBS_V18_IDENT + OBS_V18_ROUTE),
+                      ("v18 health fields", OBS_V18_OLD, OBS_V18_NEW)],
+                "[OBS 2026-09-02]", dry)
+
     print()
     print("RESULT: A1 " + ("OK" if ok1 else "NOT APPLIED") +
-          " | B5 " + ("OK" if ok2 else "NOT APPLIED"))
+          " | B5 " + ("OK" if ok2 else "NOT APPLIED") +
+          " | OBS-V7 " + ("OK" if ok3 else "NOT APPLIED") +
+          " | OBS-V18 " + ("OK" if ok4 else "NOT APPLIED"))
     if ok1 or ok2:
         print("Next: nssm restart SniperExecutorV7   (and/or SniperExecutorV18)")
-    return 0 if (ok1 and ok2) else 1
+    return 0 if (ok1 and ok2 and ok3 and ok4) else 1
 
 
 if __name__ == "__main__":

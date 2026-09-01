@@ -1219,6 +1219,20 @@ def webhook():
         log.warning(f"[REJECT-TELEMETRY] skipped (non-fatal): {_re}")
     return jsonify(result)
 
+# [OBS 2026-09-02] deployed-commit identity, read once at start
+def _deploy_commit():
+    try:
+        import subprocess as _sp
+        return _sp.run(["git", "-C", os.path.dirname(os.path.abspath(__file__)),
+                        "rev-parse", "--short", "HEAD"],
+                       capture_output=True, text=True, timeout=5).stdout.strip() or "untracked"
+    except Exception:
+        return "untracked"
+
+
+_GIT_COMMIT = _deploy_commit()
+
+
 @app.route("/health",methods=["GET"])
 def health():
     ok=xtb._connected and xtb._login_ok
@@ -1236,6 +1250,7 @@ def health():
         "wins":state.get("total_wins",0),"losses":state.get("total_losses",0),
         "memory":stats_summary(50),"weights_updated":w.get("updated_at","never"),
         "discipline":discipline.status_dict(),"uptime_since":_start,
+        "git_commit":_GIT_COMMIT,"service_version":"v7-bot",
     }),200 if ok else 503
 
 @app.route("/clusters",methods=["GET"])

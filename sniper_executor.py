@@ -83,13 +83,29 @@ else:
         log.warning("MT5 initialize() returned True but account_info() is None")
 
 # ── ROUTES ──────────────────────────────────────────────────────────────────
+# [OBS 2026-09-02] identity for the Git<->Production MATCH light.
+# This file runs as a loose copy in C:\Users\Administrator, so "untracked"
+# is the HONEST reading there until the service is repointed at the clone.
+def _deploy_commit():
+    try:
+        import subprocess as _sp, os as _os
+        return _sp.run(["git", "-C", _os.path.dirname(_os.path.abspath(__file__)),
+                        "rev-parse", "--short", "HEAD"],
+                       capture_output=True, text=True, timeout=5).stdout.strip() or "untracked"
+    except Exception:
+        return "untracked"
+
+
+_GIT_COMMIT = _deploy_commit()
+
+
 @app.route("/health", methods=["GET"])
 def health():
     if not ensure_mt5():
         return jsonify({"status":"error","msg":"mt5 disconnected"}), 503
     acc = mt5.account_info()
     if acc:
-        return jsonify({"status":"ok","account":acc.login,"balance":acc.balance,"equity":acc.equity})
+        return jsonify({"status":"ok","account":acc.login,"balance":acc.balance,"equity":acc.equity,"git_commit":_GIT_COMMIT,"service_version":"sniper-executor-v7"})
     return jsonify({"status":"error","msg":"no account info"}), 503
 
 @app.route("/positions", methods=["GET"])

@@ -620,6 +620,10 @@ def handle_signal(payload: dict, raw_body: bytes = b"") -> dict:
         _grade = str(payload.get("grade","")).upper().strip()
         _v4rr  = bool(payload.get("v4_rr", False))
         if _typ != "SMART_SCALP":
+            # [C4 2026-09-01 DECISION] PULLBACK stays v18-only ON PURPOSE:
+            # v7 is the scalp arm; auto_live.py is the pullback engine,
+            # collecting in shadow. Deliberate routing, not an oversight.
+            # Revisit at the Friday review with the dry-run numbers.
             log.info(f"[v17v18-NOISE] dropped — type={_typ} not actionable")
             return {"status":"ignored","msg":f"{_sys} non-trade type"}
         if _grade not in ("A","A+","B"):

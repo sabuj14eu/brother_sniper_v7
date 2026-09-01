@@ -7,6 +7,12 @@ log=logging.getLogger("sniper.equity_guard")
 DAILY_DD_LIMIT_PCT = 0.99
 TOTAL_DD_LIMIT_PCT = 0.99
 WEEKLY_DD_LIMIT_PCT = 0.99
+# [A6 2026-09-01] LIMITS ARE EFFECTIVELY OFF (99%) — a deliberate, logged demo
+# decision by Shyam; no number here changes without his explicit words.
+import logging as _lg
+_lg.getLogger("sniper.equity").warning(
+    "DD guard effectively OFF (daily/weekly/total = 99%%) — demo decision, "
+    "message-truth fix only; real limits ship only on Shyam's explicit numbers")
 RISK_SCALE_TABLE=[(0.90,1.00),(0.80,0.75),(0.70,0.50),(0.00,0.00)]
 
 @dataclass
@@ -55,7 +61,7 @@ class EquityGuard:
             return self._block("total",daily_used,weekly_used,equity_pct,"HARD STOP: manual reset required")
         if total_loss>=total_limit:
             eq.hard_stopped=True
-            return self._block("total",daily_used,weekly_used,equity_pct,"Total DD 20pct hit")
+            return self._block("total",daily_used,weekly_used,equity_pct,"Total DD limit hit ("+str(int(TOTAL_DD_LIMIT_PCT*100))+"pct)")
         if weekly_loss>=weekly_limit:
             return self._block("weekly",daily_used,weekly_used,equity_pct,"Weekly limit hit")
         if daily_loss>=daily_limit:

@@ -99,7 +99,9 @@ def record_signal(payload: dict, raw_entry_price: Optional[float] = None) -> dic
     session   = payload.get("session") or _get_session(now)
     zone      = payload.get("zone", "")
     action    = payload.get("action", "")
-    htf_agree = bool(payload.get("htf_agree", False))
+    # [C2 2026-09-01] Pine emits htf_align (verified in source); htf_agree
+    # never arrives — reading it alone stored False on every record.
+    htf_agree = bool(payload.get("htf_align", payload.get("htf_agree", False)))
 
     # Determine signal category for analytics
     category = _categorize(signal, sigtype)

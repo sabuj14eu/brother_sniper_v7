@@ -95,8 +95,11 @@ def health():
 @app.route("/positions", methods=["GET"])
 def positions():
     try:
-        ensure_mt5()
+        if not ensure_mt5():
+            return jsonify({"status":"error","msg":"mt5 disconnected"}), 503
         pos = mt5.positions_get()
+        if pos is None:
+            return jsonify({"status":"error","msg":"positions_get None (mt5 not ready)"}), 503
         if pos:
             return jsonify({"count":len(pos),"positions":[
                 {"ticket":p.ticket,"symbol":p.symbol,"profit":p.profit,

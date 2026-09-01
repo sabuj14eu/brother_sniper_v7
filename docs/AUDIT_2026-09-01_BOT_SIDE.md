@@ -401,3 +401,35 @@ checks, deploy ceremony, entry in docs/OPEN_ITEMS.md until verified live.
   `executor_ic_markets` (B5 when built) is in git only until the Windows
   services (NSSM SniperExecutorV7/V18) are updated and restarted with the
   ceremony. Git green ≠ live.
+
+---
+
+## MILESTONE ACCEPTANCE + FREEZE (locked 2026-09-02, explicit user decision)
+
+The observability milestone is COMPLETE only when BOTH chains have real,
+recorded evidence — not "the page renders":
+
+CHAIN 1 (engineering): watcher → incident auto-opened → investigation →
+root cause + fix + tests written INTO the incident → visible in the
+browser → human APPROVE/REJECT → real recovery → RESOLVED → audit trail
+preserved. (Day-one state: 3 incidents auto-opened unattended 21:57:32;
+fallback_id 0/29; 621 tests. The open half: work INC-0001/2/3 through the
+UI to resolution — they ARE the acceptance test, do not stage a fake fault.)
+
+CHAIN 2 (trading eyes): live market data → source + timestamp + freshness
+→ Live Trading Brain (/brain-view) → honest state. STALE/UNKNOWN never
+becomes a direction.
+
+THEN: 🧊 FREEZE. No new indicators, no new AI council, no new autonomous
+trading logic, no "one more feature". The system runs and collects
+evidence; the next phase begins only after the eyes have proven honest
+over time. The reds on the board are not embarrassing — they are the
+product working.
+
+Still open at lock time: brain restart + 5.01 pull; INC-0001 (does US10Y
+15m ever flow? — bot side answers), INC-0002 (bias coverage USA500/
+XRPUSD/USOIL — bot side), INC-0003 (expected to resolve/re-scope under
+5.01 — platform side); Git↔Production MATCH after restart (two honest
+exceptions recorded); first APPROVE audit rows; Friday verification list;
+PLAT-HOLDOUT-1 (the ONE build item exempt from the freeze, since it
+enforces an existing law).

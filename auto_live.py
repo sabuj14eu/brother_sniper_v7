@@ -349,8 +349,14 @@ def main() -> int:
                   f"(SL {c['sl']}, TP {c['tp']}, RR {c['rr']}); AUTO_LIVE_ARM=1 to go live")
             continue
         try:
+            # [08-31] v7's handler requires the shared secret (AUTOLIVE is not
+            # in its auto-trust list — correctly, that list is spoofable).
+            # Added ONLY at POST time: the secret never touches the dry log,
+            # the state file, or stdout (Iron Rule 8).
+            _secret = _env("WEBHOOK_SECRET")
+            _body = {**payload, "secret": _secret} if _secret else payload
             req = urllib.request.Request(
-                WEBHOOK, data=json.dumps(payload).encode(),
+                WEBHOOK, data=json.dumps(_body).encode(),
                 headers={"Content-Type": "application/json"})
             with urllib.request.urlopen(req, timeout=15) as r:
                 reply = json.loads(r.read().decode())

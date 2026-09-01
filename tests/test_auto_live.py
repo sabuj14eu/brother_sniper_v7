@@ -147,3 +147,17 @@ def test_scenario_carries_its_own_clock():
                                          time.gmtime(closed_end))
     short = scenario("SILVER", [], 3.0, now=now)
     assert short["as_of"]                        # even empty states carry a clock
+
+
+def test_secret_never_reaches_the_dry_log():
+    """The armed POST adds the shared secret at send time only; the dry-run
+    journal and the logged payload must never contain it (Iron Rule 8)."""
+    src = (Path(__file__).resolve().parents[1] / "auto_live.py").read_text()
+    # the secret is injected into _body for the request, after DRY_LOG writes
+    assert '"secret": _secret' in src.replace("'", '"')
+    dry_write = src.index("DRY_LOG")
+    inject = src.index("_secret = _env(")
+    assert inject > dry_write            # injection happens after the dry log write
+    # and the payload dict literal itself carries no secret key
+    assert '"secret":' not in src[src.index('payload = {"system": "AUTOLIVE"'):
+                                  src.index("with open(DRY_LOG")]

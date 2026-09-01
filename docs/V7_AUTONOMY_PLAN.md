@@ -301,3 +301,36 @@ Learning: scenario records now carry event_class/surprise/phase, so
 conditional_profile's cells (GOLD + HOT PCE + NY + WITH-TREND ...) accrue
 from the same journal; no learned edge is claimed under the floor.
 AI's role stays explanation-only; nothing in this engine places trades.
+
+## EXTERNAL REVIEW VERDICTS (2026-08-31) — every claim verified before belief
+
+| Claim | Verdict | Action |
+|---|---|---|
+| P0 executor reports MT5 failure as zero positions -> fake $0 losses, self-pause | CONFIRMED (worse: MT5-disconnect returns clean count:0 HTTP 200; ensure_mt5() return ignored) | patch_truth_guards.py (bot: shape guard + 10-cycle unverified-close guard) + patch_executor_positions.py (Windows: 503 on disconnect) |
+| P0 webhook auth self-defeating (secret self-injection + spoofable XFF) | CONFIRMED (bot.py 584-589, _guard XFF-first) | patch_truth_guards.py: XFF honored only from loopback (our nginx); injection now sits behind a real IP check. Removing injection outright would cut Pine off — not done. |
+| P0 signal_id collision GOLD/SILVER same bar -> dedup drops second trade | REFUTED — v7 mints its own dedup key sha256(symbol-direction-entry) at bot.py:286; symbol is already in it | none needed |
+| push_bias reads Pine fields at wrong nesting -> journal bias always empty | CONFIRMED — same bug class as check_pine_ver v1; pass-through keys live in context.market_snapshot | fixed in brain repo (reads both levels), rehearsed on both shapes |
+| v7 drops ALL PULLBACK signals via noise filter | CONFIRMED — bot.py:623 `_typ != "SMART_SCALP"` drops every BSv17/18 non-scalp type, PULLBACK included, while PULLBACK is the VALIDATED trigger (n=640, PF 1.30-1.45) | DECISION CARD for Shyam — enabling a signal class is a live-trading change, never silent |
+| DD guard 99% while claiming 20% | CONFIRMED — risk/equity_guard.py daily/weekly/total all 0.99 | DECISION CARD for Shyam — Iron Rule 7: risk limits are his call, logged |
+| /webhook/polymarket unauthenticated, costs AI budget per hit | CONFIRMED | env-gated PM_WEBHOOK_SECRET (brain repo); unset = unchanged |
+| auto_live payloads rejected when armed (found during verification, not in the review) | CONFIRMED — no secret, AUTOLIVE not in trust list | secret added at POST time only; test pins that it never reaches the dry log |
+| journal outcomes only via unscheduled manual script; can destroy live rows | NOT YET VERIFIED | queued — verify before Friday |
+| one-witness clock in executor /candles | NOT YET VERIFIED | queued |
+| dashboard AI-mode toggle unauthenticated | NOT YET VERIFIED (dashboard is platform/brain surface) | queued, relay to platform session |
+| EV/cluster learning layer structurally inert | NOT YET VERIFIED | queued — needs its own reading, not a drive-by |
+
+### DECISION CARDS — Shyam's call, not mine (Iron Rule 7 / Evidence Law)
+
+1. PULLBACK on v7: the validated trigger (n=640, out-of-sample PF
+   1.30-1.45, Asia 73.6% WR) never reaches v7 — the noise filter drops
+   every non-SMART_SCALP type. Options: (a) leave as is (v7 stays the
+   scalp arm; PULLBACK lives in auto_live's own engine, which is the
+   same trigger family and already shadow-deployed), (b) allow type
+   PULLBACK through v7's full gate chain. My recommendation: (a) for
+   now — auto_live IS the pullback path, with dry-run evidence accruing;
+   revisit at Friday's review with the dry week in hand.
+2. DD guard: daily/weekly/total all effectively OFF at 99%. On DEMO the
+   money risk is zero but the MEASUREMENT risk is real (a runaway loss
+   streak pollutes every population). If you want real limits, name the
+   numbers (e.g. daily 5% / weekly 10% / total 20%) and I ship them as
+   an explicit, logged change. Tightening only — never widened silently.

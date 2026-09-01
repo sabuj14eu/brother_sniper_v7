@@ -363,3 +363,41 @@ at arm; no forming-bar leak found.
 
 Each fix: own branch, regression test first where feasible, `pytest`/compile
 checks, deploy ceremony, entry in docs/OPEN_ITEMS.md until verified live.
+
+---
+
+## VERIFICATION ROUND — 2026-09-02 (audit session, against pushed branches)
+
+- **META 0.1 → WITHDRAWN, with a process finding.** Commit `6063676`
+  (Pine id adopted via `canonical_signal_id` + `signal_id_source`) exists on
+  `claude/evidence-integrity-audit-35rlfa`; the audit clone did not have
+  that branch. B1 is DONE. Remaining risk: `main` in both repos is stale
+  relative to the deploy branch — two truths in one repo. Recommend making
+  the deploy branch the default or merging it to main after each round.
+- **"Audit file never pushed" → REFUTED.** The branch
+  `claude/signalmesh-autonomous-engineer-9lj1na` exists on both remotes
+  (brain `0a2e377`, v7 `5be81d9`); the bot session had not fetched it.
+- **C1 → STANDS, re-verified on the deploy branch.** `bot.py:285` returns
+  the RAW Pine signal_id whenever present; the sha256(symbol-direction-
+  entry) at `:286` is only the fallback when the payload has no id. Pine
+  always sends an id on SMART_SCALP/PULLBACK, and its ids carry no symbol —
+  so two symbols firing the same direction on the same bar close collide and
+  the second is dropped as "duplicate". Fix: prefix the symbol
+  (`f"{p.get('symbol','')}:{p['signal_id']}"`); retries/mirror duplicates
+  carry the same symbol, so dedup is not weakened.
+- **A2 "XFF fixed" → NOT ON THE PUSHED BRANCH.** `bot.py:577` on
+  `claude/evidence-integrity-audit-35rlfa` still takes the FIRST
+  X-Forwarded-For entry (attacker-controlled). Auto-injection staying until
+  the nginx mirror injects the secret is ACCEPTED as a sequencing decision.
+- **Spot-checks PASSED:** C2 (htf_align + red→green test), C3 (mirror
+  forwards pine_ver/payload_schema/fired_at/session/tf/score), A6 (limits
+  untouched, honest message + loud startup line), B3 (auth block present —
+  fail-closed behavior when env unset goes to the Friday verify list).
+- **A1 10-cycle policy → ACCEPTED** over infinite retry, on condition the
+  unverified close is journaled as UNVERIFIED and never increments
+  consecutive_losses — confirm in the Friday round.
+- **Deploy gap:** no work has reached the Windows VPS yet. Every fix
+  touching `sniper_executor.py` (A1 executor 503) or
+  `executor_ic_markets` (B5 when built) is in git only until the Windows
+  services (NSSM SniperExecutorV7/V18) are updated and restarted with the
+  ceremony. Git green ≠ live.

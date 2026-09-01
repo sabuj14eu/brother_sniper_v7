@@ -14,3 +14,11 @@ __pycache__/
 .venv*/
 venv/
 data/
+
+# [MATCH 2026-09-02] live mutable state — owned by the RUNNING bot, never by
+# git. Tracking these made the box unable to sit on origin/main (a pull
+# would overwrite live memory), which kept the Git<->Production light
+# honest-red forever. The repo keeps only the static backup snapshot.
+state.json
+signal_memory.json
+governance/discipline_state.json

@@ -154,3 +154,31 @@ all present on this branch (verified file:line, brain OPEN_ITEMS ROUND 3).
    (C:\Users\Administrator\sniper_executor.py) matches _macro_front 2x —
    it is the mirror-branch bridge + the A1 patch. The deploy branch's copy
    is a landmine until converged.
+
+## QUEUED ORGAN — NVDA (NVDA.NAS-24, "NVIDIA Corp 24/5 CFD"), asked by Shyam 2026-09-02
+
+Decision recorded: a single-stock CFD is NOT gold, not an index, not crypto,
+and gets its OWN engine — but the engine is written from NVDA's evidence,
+not from assumptions about it. Phases, none skippable (V7 plan; Evidence
+Law; "probe end to end before enabling", platform OPEN_ITEMS 08-17):
+0. PROBE (no logic, no risk): symbol_info on the v7 terminal — digits,
+   volume_min/step, contract size, trade_mode, sessions, spread now vs
+   overnight. A name that resolves is not a name that fills.
+1. COLLECT (config only): BB_CANDLE_SYMBOLS += NVDA.NAS-24 on the reporter;
+   platform alias NVDA.NAS-24 -> NVDA (append-only, platform session);
+   TradingView alert on NASDAQ:NVDA with the FROZEN Pine (alert ceremony,
+   no Pine edit). Signals land in the mirror as symbol NVDA, judged and
+   journaled by both arms, NOT tradable: v7 gate keeps NVDA out of
+   auto_live's hunt list; council marks it shadow.
+2. ANALYZE (>=100 shadow signals or 4 weeks, whichever later): session
+   cut (regular 13:30-20:00 UTC vs 24/5 extended), earnings-window cut,
+   gap-open behaviour, spread cost per ATR, with-trend vs counter. What
+   "different logic" means is the OUTPUT of this step.
+3. ENGINE nvda-v1 as a NEW versioned engine, dark flag, shadow -> paper ->
+   controlled size, each gate with n and the validate column deciding.
+Known facts that shape the design (to be confirmed by phase 0/2, not
+assumed): earnings gaps make overnight holds a different risk class;
+overnight CFD spread is a multiple of the regular-session spread; the
+platform's MAJOR_EARNINGS playbook already names Nvidia as a US100
+driver, so NVDA and US100 signals will be correlated — position them as
+ONE exposure, never two.

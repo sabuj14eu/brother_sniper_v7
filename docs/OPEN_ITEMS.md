@@ -164,6 +164,15 @@ Law; "probe end to end before enabling", platform OPEN_ITEMS 08-17):
 0. PROBE (no logic, no risk): symbol_info on the v7 terminal — digits,
    volume_min/step, contract size, trade_mode, sessions, spread now vs
    overnight. A name that resolves is not a name that fills.
+   MEASURED 2026-09-02 (terminal 52834417, quoted):
+     NVDA.NAS-24 | NVIDIA Corp 24/5 CFD | digits 2 | vol min/step/max
+     0.1 0.1 1000.0 | contract 1.0 | trade_mode 4 (FULL) | bid/ask 0.0 0.0
+     | spread pts 0 | currency USD
+   Read: 1 lot = 1 share, 0.1-share granularity, cents pricing, fully
+   tradable by mode. bid/ask 0.0 right after symbol_select = no tick
+   received yet, NOT "no market" — re-probe after the symbol has sat in
+   Market Watch for a minute, and once in the US session, once overnight,
+   so the two spreads are measured, never assumed.
 1. COLLECT (config only): BB_CANDLE_SYMBOLS += NVDA.NAS-24 on the reporter;
    platform alias NVDA.NAS-24 -> NVDA (append-only, platform session);
    TradingView alert on NASDAQ:NVDA with the FROZEN Pine (alert ceremony,

@@ -8,7 +8,7 @@ listed at the end so nobody waits on the wrong side.
 1. Print the SIDE on breakout states: "BREAKOUT_CONFIRMED · UP (above
    218.550)" / "DOWN (below 216.050)". Never BUY/SELL — the card judges
    state, engines decide. Proof: the NY lane card shows the side.
-2. Stamp every NVDA state with its liquidity tier: REGULAR 13:30-20:00 UTC
+2. Stamp every NVDA state with its liquidity tier: REGULAR 09:30-16:00 America/New_York (13:30-20:00 UTC in summer, 14:30-21:00 in winter — the platform computed it in local time, correcting this spec)
    · PRE/AFTER-MARKET · OVERNIGHT/WEEKEND. Same words in different tiers
    are different facts. Do NOT build Asia/London lanes for a single-stock
    CFD. Proof: tier visible on the card, stored on the lane row.
@@ -53,3 +53,17 @@ listed at the end so nobody waits on the wrong side.
    rotate WEBHOOK_SECRET.
 4. DXY_U6 roll watch, mid-September (first "symbol not known" line).
 5. NVDA phase 2 in ~4 weeks: three shadow populations, one key (NVDA).
+
+## Platform reply 2026-09-02 (recorded; deploy pending Shyam)
+Done: A1 (side UP/DOWN + level; BUY/SELL guarded by test; WAIT/WATCH carry
+None), A2 (tiers in America/New_York — my fixed-UTC spec would have been
+wrong four months a year; corrected above), A3, A4, A5 partial (spread
+labelled with its tier; regular-vs-after-hours needs a spread HISTORY =
+schema change, ships alone), C10 (US10Y = yield permanently). Earlier:
+B8 merged 99c09d8 --no-ff; D12 shipped in v5.00.
+Refused with reason, accepted: B9 — flapping cannot be measured from one
+mutable row per user; needs an append-only identity journal (new table +
+migration), ships alone with its own tests. Correct refusal: an inferred
+fault is the thing this week was spent removing.
+Shyam's buttons: RESOLVE on INC-0001 and INC-0003 (no agent may).
+Still open: C11 dead rows (Shyam), D13 (brain repo, bot side).

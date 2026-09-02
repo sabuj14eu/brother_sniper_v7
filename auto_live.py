@@ -293,23 +293,38 @@ def _fired_recently(state, sym, c, now):
     return (now - state.get(k, 0)) < REFIRE_COOLDOWN_S, k
 
 
+def split_symbol_spec(spec: str) -> tuple[str, str]:
+    """[2026-09-02, platform relay] One name for the record, one for the wire.
+    AUTO_LIVE_SYMBOLS entries are either "SILVER" (same name both sides) or
+    "NVDA=NVDA.NAS-24": the CANONICAL name (left) keys every journal row,
+    scenario and candidate — the same key Pine and the brain use, so the
+    three shadow populations join in four weeks — while the BROKER name
+    (right) is what the bridge is asked for, because the bridge passes
+    unmapped names verbatim to MT5. Never key a record by a broker name."""
+    spec = spec.strip().upper()
+    if "=" in spec:
+        canon, broker = (x.strip() for x in spec.split("=", 1))
+        return canon, broker or canon
+    return spec, spec
+
+
 def main() -> int:
     os.makedirs(os.path.join(DIR, "logs"), exist_ok=True)
     base = _env("EXECUTOR_URL").replace("/execute", "")
     if not base:
         print("REFUSED: EXECUTOR_URL unset")
         return 1
-    symbols = [s.strip().upper() for s in
+    symbols = [split_symbol_spec(s) for s in
                _env("AUTO_LIVE_SYMBOLS", "SILVER,GBPUSD,US30").split(",") if s.strip()]
     max_dist = float(_env("AUTO_LIVE_MAX_DIST", "3.0"))
     armed = _env("AUTO_LIVE_ARM", "0").lower() in ("1", "true", "yes")
     state = _state()
     now = time.time()
     events = _fetch_calendar()                    # None -> UNKNOWN, never faked
-    for sym in symbols:
+    for sym, broker_sym in symbols:
         try:
             with urllib.request.urlopen(
-                    f"{base.rstrip('/')}/candles?symbol={sym}&tf={TF_MIN}&n=120",
+                    f"{base.rstrip('/')}/candles?symbol={broker_sym}&tf={TF_MIN}&n=120",
                     timeout=10) as r:
                 rows = (json.loads(r.read().decode()) or {}).get("rows") or []
                 # bridge builds differ: some serve o/h/l/c, some open/high/low/close,
@@ -346,6 +361,7 @@ def main() -> int:
                    "tp1": c["tp1"], "rr": c["rr"], "atr": c["atr"],
                    "structure": c["structure"],
                    "entry_dist_atr": c["entry_dist_atr"],
+                   "broker_symbol": broker_sym,   # append-only: the wire name, for audit
                    "pine_dependency": "NONE",
                    "time": c["bar_ts"]}
         with open(DRY_LOG, "a", encoding="utf-8") as f:

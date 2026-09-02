@@ -161,3 +161,27 @@ def test_secret_never_reaches_the_dry_log():
     # and the payload dict literal itself carries no secret key
     assert '"secret":' not in src[src.index('payload = {"system": "AUTOLIVE"'):
                                   src.index("with open(DRY_LOG")]
+
+
+# ── 2026-09-02: canonical name for the record, broker name for the wire ──
+def test_symbol_spec_plain_name_is_both():
+    from auto_live import split_symbol_spec
+    assert split_symbol_spec("silver") == ("SILVER", "SILVER")
+
+
+def test_symbol_spec_canonical_equals_broker():
+    from auto_live import split_symbol_spec
+    assert split_symbol_spec("NVDA=NVDA.NAS-24") == ("NVDA", "NVDA.NAS-24")
+    assert split_symbol_spec(" nvda = nvda.nas-24 ") == ("NVDA", "NVDA.NAS-24")
+    assert split_symbol_spec("NVDA=") == ("NVDA", "NVDA")
+
+
+def test_records_key_by_canonical_and_wire_by_broker():
+    """The fetch URL must carry the broker name; every record (scenario,
+    candidate, signal_id) must carry the canonical one."""
+    src = (ROOT / "auto_live.py").read_text(encoding="utf-8") if "ROOT" in globals() else \
+        open(__import__("os").path.join(__import__("os").path.dirname(__file__), "..", "auto_live.py"), encoding="utf-8").read()
+    assert "/candles?symbol={broker_sym}&tf=" in src
+    assert "rec = scenario(sym, rows" in src
+    assert '"symbol": sym,' in src and '"broker_symbol": broker_sym' in src
+    assert 'f"AL-{c[\'direction\']}-{sym}-{c[\'bar_ts\']}"' in src

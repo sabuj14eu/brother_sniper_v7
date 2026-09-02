@@ -194,3 +194,21 @@ overnight CFD spread is a multiple of the regular-session spread; the
 platform's MAJOR_EARNINGS playbook already names Nvidia as a US100
 driver, so NVDA and US100 signals will be correlated — position them as
 ONE exposure, never two.
+
+### NVDA PHASE 1 — three collectors live 2026-09-02 (platform 5.08 read-only, quoted)
+    NVDA stored under the canonical name: 15m 101 rows (first 2026-09-01
+    15:30Z), 1h 100, 4h 100, 1d 100, 1m 120 · rows under the broker name: 0
+    · lane_observations: 6 · bias rows: 0 (expected).
+Collectors: Pine alert (NASDAQ:NVDA, brain ShadowGate), reporter candles
+(NVDA.NAS-24 -> NVDA at the platform door), platform paper lanes, and
+auto_live in shadow. Nothing can trade it.
+JOIN-KEY FIX (platform relay, accepted): auto_live keyed its own journal
+by the broker name. Now AUTO_LIVE_SYMBOLS takes "NVDA=NVDA.NAS-24": the
+canonical name keys every record and signal_id, the broker name goes on
+the wire only (kept as broker_symbol, append-only). .env line becomes
+    AUTO_LIVE_SYMBOLS=SILVER,GBPUSD,US30,NVDA=NVDA.NAS-24
+Rows written before this fix by the single dry run are keyed NVDA.NAS-24
+in logs/auto_scenarios.jsonl / auto_live.jsonl — left as they are, dated,
+and excluded by key when the populations are compared.
+Tests: test_auto_live.py::test_symbol_spec_* + test_records_key_by_
+canonical_and_wire_by_broker (111 total).

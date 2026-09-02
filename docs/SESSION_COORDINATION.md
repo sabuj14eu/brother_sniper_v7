@@ -89,10 +89,17 @@ IS versioned — `Sniper-System/agents/mt5_reporter/mt5_reporter.py`,
 5260ce9). The warning above was true when written (08-19). What remains
 unversioned is whatever `C:\brotherbot\mt5_reporter.py` runs if it differs
 from that file — `Get-FileHash` both before trusting either. Same shape,
-found the same day: the DXY/US10Y/US30Y front-contract resolver recorded
-as "done bot-side 2026-08-20" exists in NO pushed repo (`expiration_time`
-has zero hits in brother_sniper_v7 and brother-brain-v2). If the box's
-`sniper_executor.py` carries it, it is box-only, like snapshot 1baa72a.
+found the same day, then corrected within the hour (a partial read again —
+lesson C1): the DXY/US10Y/US30Y front-contract resolver IS pushed, on
+`claude/brain-platform-mirror-fcacwl` (fc5bd6f, 2026-08-20, with
+`tests/test_front_contract.py` and `probe_symbol_specs.py`) — but NOT on
+the deploy branch. The two branches have diverged 34/41 commits from base
+88fe2d8 (69 files). The Windows bridge was A1-patched in place, so which
+bridge it runs is a measurement, not a branch name:
+`Select-String C:\Users\Administrator\sniper_executor.py -Pattern "_macro_front"`
+(a hit = mirror-branch bridge with the resolver). Convergence of the two
+branches is the top structural open item — until then the deploy branch's
+`sniper_executor.py` must never be copied over the box's.
 
 ## Shared contracts already agreed (do not fork these)
 - Platform mirror: `learning/platform_mirror.py` (v7) / `brain/src/platform_mirror.py`

@@ -119,8 +119,9 @@ all present on this branch (verified file:line, brain OPEN_ITEMS ROUND 3).
    log line: "[A2] secret from header (system=BSv18)".
 2. Incident posting — post_incident.py now sends BOTH incident_id and
    public_id (append-only; works on platform <5.04 and >=5.04). Test:
-   test_incident_poster_sends_both_id_keys. INC-0001/INC-0002 re-posts
-   run from the box; not done until the platform's reply is quoted here.
+   test_incident_poster_sends_both_id_keys. POSTED from the box
+   2026-09-02: "posted INC-0001 -> 200", "posted INC-0002 -> 200" (Shyam's
+   terminal, quoted). The archive in brain OPEN_ITEMS is now on the board.
 3. INC-0001 + INC-0003 are one process — see brain OPEN_ITEMS ROUND 3:
    the reporter (Sniper-System/agents/mt5_reporter, v1.6.0) is BOTH the
    US10Y 15m feeder and the ONLY writer of /api/v1/heartbeat/vps. The
@@ -131,3 +132,13 @@ all present on this branch (verified file:line, brain OPEN_ITEMS ROUND 3).
    verifiable from here.
 5. Not changed, deliberately: no trading logic, no risk number, no Pine,
    no bias push list (naming contract waits on the platform, 5.03).
+6. BRANCH DIVERGENCE (found 2026-09-02): claude/brain-platform-mirror-fcacwl
+   carries 41 commits the deploy branch lacks (bridge front-contract
+   resolver fc5bd6f, /symbolspec + probe_symbol_specs.py, BRIDGE_KEY gate,
+   v7_evidence_report, v7_counterfactual, ...) and the deploy branch has 34
+   it lacks (A1/A2/C1/C2/B7 patches, round 2-3). probe_symbol_specs.py is
+   therefore missing on the box ("No such file", Shyam 2026-09-02). Until
+   the two are merged: single-file checkouts from the mirror branch, and
+   the deploy branch's sniper_executor.py is NEVER copied over the box's.
+   Merge is a deliberate round of its own (69 files; both bridge copies
+   changed the same file).

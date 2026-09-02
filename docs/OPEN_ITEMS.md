@@ -122,6 +122,15 @@ all present on this branch (verified file:line, brain OPEN_ITEMS ROUND 3).
    test_incident_poster_sends_both_id_keys. POSTED from the box
    2026-09-02: "posted INC-0001 -> 200", "posted INC-0002 -> 200" (Shyam's
    terminal, quoted). The archive in brain OPEN_ITEMS is now on the board.
+   CORRECTION (platform contract v5.04, quoted): an agent may report only
+   INVESTIGATING / PATCH_PROPOSED; RESOLVED is refused with a reason while
+   the fields still save. So "posted INC-0001 -> 200 (--status resolved)"
+   SAVED the closing evidence but did NOT resolve it — the board holds
+   INC-0001 at INVESTIGATING until Shyam presses APPROVE/RESOLVE. The
+   poster now normalizes to the contract, refuses "resolved" at argparse,
+   and prints the board's status + any refusal (a bare 200 hid it once).
+   Tests: test_incident_status_matches_platform_contract,
+   test_incident_reply_never_hides_a_refusal.
 3. INC-0001 + INC-0003 are one process — see brain OPEN_ITEMS ROUND 3:
    the reporter (Sniper-System/agents/mt5_reporter, v1.6.0) is BOTH the
    US10Y 15m feeder and the ONLY writer of /api/v1/heartbeat/vps. The

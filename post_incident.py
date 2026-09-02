@@ -13,7 +13,7 @@ line fixes it, no redeploy. Same auth as every other ingest.
         --root-cause "executor served count:0 while MT5 was down" \
         --fix-ref "brother_sniper_v7@<commit> patch_truth_guards.py" \
         --tests "tests/test_round2_guards.py 2 passed" \
-        [--status resolved] [--dry-run]
+        [--status investigating|patch_proposed] [--dry-run]
 """
 from __future__ import annotations
 
@@ -42,6 +42,32 @@ def _env(key, default=""):
     return default
 
 
+# Platform contract (v5.04, quoted by the platform session 2026-09-02): an
+# agent may report INVESTIGATING or PATCH_PROPOSED — nothing else. APPROVED,
+# REJECTED and RESOLVED are the human's buttons: the platform refuses them
+# with a reason while still saving the fields. The reply carries "status"
+# (what the board now shows) and "refused" (why the ask did not apply); a
+# bare "-> 200" hid exactly that refusal once, so both are printed.
+STATUS_MAP = {"investigating": "INVESTIGATING",
+              "patch_proposed": "PATCH_PROPOSED",
+              "fix_proposed": "PATCH_PROPOSED"}   # old spelling, same meaning
+
+
+def normalize_status(s):
+    return STATUS_MAP[str(s).strip().lower()]
+
+
+def report_reply(incident_id, http_status, body):
+    try:
+        d = json.loads(body or b"{}")
+    except Exception:
+        d = {}
+    line = f"posted {incident_id} -> {http_status}; board status: {d.get('status', '?')}"
+    if d.get("refused"):
+        line += f"\n  REFUSED: {d['refused']}"
+    return line
+
+
 def build_payload(args):
     # Both id keys, always: the platform read only public_id until its 5.04
     # (2026-09-02) and only incident_id is what this side sent -> 404 "no
@@ -50,7 +76,7 @@ def build_payload(args):
     return {"kind": "incident_update", "incident_id": args.incident_id,
             "public_id": args.incident_id,
             "root_cause": args.root_cause, "fix_ref": args.fix_ref,
-            "tests_summary": args.tests, "status": args.status,
+            "tests_summary": args.tests, "status": normalize_status(args.status),
             "source": "bot session",
             "ts": datetime.now(timezone.utc).isoformat()}
 
@@ -61,8 +87,9 @@ def main():
     ap.add_argument("--root-cause", required=True, dest="root_cause")
     ap.add_argument("--fix-ref", required=True, dest="fix_ref")
     ap.add_argument("--tests", required=True)
-    ap.add_argument("--status", default="fix_proposed",
-                    choices=["investigating", "fix_proposed", "resolved"])
+    ap.add_argument("--status", default="investigating",
+                    choices=sorted(STATUS_MAP),
+                    help="what an agent may report; approve/reject/resolve are the human's buttons on the board")
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args()
     payload = build_payload(args)
@@ -78,7 +105,7 @@ def main():
         f"{url.rstrip('/')}{path}", data=json.dumps(payload).encode(),
         headers={"Content-Type": "application/json", "X-Brain-Secret": secret})
     with urllib.request.urlopen(req, timeout=15) as r:
-        print(f"posted {args.incident_id} -> {r.status}")
+        print(report_reply(args.incident_id, r.status, r.read()))
     return 0
 
 

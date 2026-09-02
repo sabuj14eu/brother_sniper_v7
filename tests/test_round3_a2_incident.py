@@ -14,7 +14,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from post_incident import build_payload  # noqa: E402
+from post_incident import build_payload, normalize_status, report_reply  # noqa: E402
 
 PATCH = "patch_webhook_header_secret.py"
 
@@ -86,4 +86,24 @@ def test_incident_poster_sends_both_id_keys():
                             fix_ref="fr", tests="t", status="investigating")
     p = build_payload(ns)
     assert p["incident_id"] == p["public_id"] == "INC-0001"
-    assert p["kind"] == "incident_update" and p["status"] == "investigating"
+    assert p["kind"] == "incident_update" and p["status"] == "INVESTIGATING"
+
+
+def test_incident_status_matches_platform_contract():
+    # v5.04 contract: an agent may say INVESTIGATING or PATCH_PROPOSED, nothing else
+    assert normalize_status("investigating") == "INVESTIGATING"
+    assert normalize_status("patch_proposed") == "PATCH_PROPOSED"
+    assert normalize_status("fix_proposed") == "PATCH_PROPOSED"   # old spelling kept
+    import pytest
+    with pytest.raises(KeyError):
+        normalize_status("resolved")      # the human's button, never ours
+
+
+def test_incident_reply_never_hides_a_refusal():
+    body = (b'{"ok": true, "public_id": "INC-0001", "status": "INVESTIGATING", '
+            b'"refused": "RESOLVED refused - the human buttons"}')
+    out = report_reply("INC-0001", 200, body)
+    assert "board status: INVESTIGATING" in out and "REFUSED" in out
+    assert "board status: PATCH_PROPOSED" in report_reply(
+        "INC-0002", 200, b'{"status": "PATCH_PROPOSED", "refused": null}')
+    assert "board status: ?" in report_reply("INC-0003", 200, b"not json")

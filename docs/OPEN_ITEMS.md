@@ -173,6 +173,9 @@ Law; "probe end to end before enabling", platform OPEN_ITEMS 08-17):
    received yet, NOT "no market" — re-probe after the symbol has sat in
    Market Watch for a minute, and once in the US session, once overnight,
    so the two spreads are measured, never assumed.
+   RE-PROBE 2026-09-02 15:46 UTC (US session, quoted): bid/ask 226.86 /
+   226.88 | spread 2 pts = $0.02 (~0.9 bp) | last tick 18:46:03 broker
+   (+3h, consistent). Overnight spread still unmeasured.
 1. COLLECT (config only): BB_CANDLE_SYMBOLS += NVDA.NAS-24 on the reporter;
    platform alias NVDA.NAS-24 -> NVDA (append-only, platform session);
    TradingView alert on NASDAQ:NVDA with the FROZEN Pine (alert ceremony,

@@ -393,6 +393,7 @@ def _monitor():
         _mon_cycle += 1
         if _mon_cycle % _MON_HEARTBEAT_EVERY == 0:
             log.info(f"[MON] alive — {sum(1 for _ in all_open_trades())} open trades")
+        _bridge_ok=True  # [V7-STATUS 2026-09-03]
         # ── [SLOT-RECON]: catch timeout-orphans — broker positions v7 isn't tracking ──
         try:
             import requests as _rq2
@@ -421,7 +422,16 @@ def _monitor():
                     log.error(f"[SLOT-RECON] CONFLICT orphan {_tk} {_osym}, {_oac} slot busy")
                     send_telegram(f"⚠️ <b>Untracked position</b>\n{_osym} ticket <code>{_tk}</code>\n{_oac} slot busy — manual review (close or wait).")
         except Exception as _re2:
+            _bridge_ok=False  # [V7-STATUS 2026-09-03]
             log.warning(f"[SLOT-RECON] sweep failed: {_re2}")
+        # ── [V7-STATUS 2026-09-03] heartbeat every cycle — display-only, fully guarded,
+        # so the desk can tell "v7 quiet" apart from "v7 down" (Iron Rule 6).
+        try:
+            from core.v7_status import update_heartbeat
+            update_heartbeat(state, equity_guard.to_dict(), bridge_ok=_bridge_ok,
+                             symbols_enabled=ALLOWED_SYMBOLS, reconciliation=None)
+        except Exception as _he:
+            log.warning(f"[V7-STATUS] heartbeat skipped (non-fatal): {_he}")
         if not any_open_trade(): continue
         try:
             with mon_lock:
@@ -1233,6 +1243,18 @@ def webhook():
             capture_reject(payload, _st, str((result or {}).get("msg","")))
     except Exception as _re:
         log.warning(f"[REJECT-TELEMETRY] skipped (non-fatal): {_re}")
+    # ── [V7-STATUS 2026-09-03] every verdict to the platform desk (display-only, guarded;
+    # cannot affect the response). Pure noise ('ignored' chart annotations)
+    # is skipped; grade/v4_rr drops ARE verdicts and are kept.
+    try:
+        _st2=str((result or {}).get("status",""))
+        _mg2=str((result or {}).get("msg",""))
+        if _st2 in ("ok","rejected","blocked","filtered","skipped","paused") \
+           or (_st2=="ignored" and ("grade" in _mg2 or "v4_rr" in _mg2)):
+            from core.v7_status import record_decision
+            record_decision(payload, result)
+    except Exception as _ve:
+        log.warning(f"[V7-STATUS] skipped (non-fatal): {_ve}")
     return jsonify(result)
 
 # [OBS 2026-09-02] deployed-commit identity, read once at start

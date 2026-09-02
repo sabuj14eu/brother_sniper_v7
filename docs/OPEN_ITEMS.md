@@ -212,3 +212,37 @@ in logs/auto_scenarios.jsonl / auto_live.jsonl — left as they are, dated,
 and excluded by key when the populations are compared.
 Tests: test_auto_live.py::test_symbol_spec_* + test_records_key_by_
 canonical_and_wire_by_broker (111 total).
+
+## ROUND 4 (2026-09-03) — "v7 DOWN 79880s" was a missing organ, not a dead bot
+
+ROOT CAUSE (measured in git): the box ran the trade-desk branch until
+2026-09-01; that branch carries core/v7_status.py (heartbeat every monitor
+cycle -> /webhooks/brain/artifact kind v7_heartbeat, cadence ~60-300s, and
+record_decision -> /webhooks/brain/decision). The deploy branch never had
+it. Moving the box onto the deploy branch and restarting on 09-01 dropped
+both emitters: the platform's last v7 heartbeat is the moment of that
+restart. The bot itself kept trading (record W86/L95, USDJPY BUY open).
+Third branch in the divergence: mirror (resolver, probes), trade-desk
+(heartbeat, decision contract, reconcile), deploy (rounds 1-4).
+
+FIX: core/v7_status.py + tests/test_v7_status.py ported verbatim from
+claude/trade-desk-architecture-review-hp9xnb; _push accepts either env
+pair (PLATFORM_URL/SECRET or PLATFORM_WEBHOOK_URL/SECRET). Hooks restored
+by patch_v7_status_hooks.py (applied to the repo bot.py): heartbeat after
+the SLOT-RECON sweep with bridge_ok = sweep reached the bridge
+(reconciliation NOT ported — core/reconcile stays on the trade-desk
+branch, next port), record_decision after REJECT-TELEMETRY in webhook().
+Tests: test_v7_status.py (12), test_v7_status_hooks.py (3); suite 126.
+PROOF after restart: platform v7 card "last heartbeat <300s ago", and
+bot.log free of "[V7-STATUS] ... skipped".
+NOTE the forked contract stands: decisions post under the raw Pine id
+(/decision), closes under v7-<id> (/signal, patch_mirror_close). One
+namespace is still a convergence decision, not tonight's patch.
+
+PERMANENT ONE-LAUNCHER RULE FOR THE REPORTER (Windows): the platform's
+service map says the NSSM service was removed 08-08 and a Scheduled Task
+is the launcher; the box says BrotherBotReporter is an NSSM service and it
+attaches fine (1.7.0 log). The four August orphans were most likely the
+Scheduled Task's instances. If that task still exists, the next reboot
+spawns a second writer again. Measure, then disable the task, keep NSSM,
+and correct the map. Commands in chat.

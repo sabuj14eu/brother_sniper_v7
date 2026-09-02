@@ -1201,11 +1201,27 @@ _start=datetime.now(timezone.utc).isoformat()
 
 
 
+# [A2 2026-09-02] the nginx mirror cannot rewrite a mirrored body, so it may
+# carry the webhook secret as a header instead (proxy_set_header
+# X-Webhook-Secret). The header fills a MISSING payload secret only, never
+# overrides one, and handle_signal stays the single place it is checked.
+def _header_secret(payload, headers):
+    try:
+        if isinstance(payload, dict) and not payload.get("secret"):
+            h = (headers.get("X-Webhook-Secret") or "").strip()
+            if h:
+                payload["secret"] = h
+                log.info("[A2] secret from header (system=%s)", payload.get("system"))
+    except Exception as e:
+        log.warning(f"[A2] header secret skipped (non-fatal): {e}")
+    return payload
+
 @app.route("/webhook",methods=["POST"])
 def webhook():
     raw=request.get_data()
     try: payload=json.loads(raw) if raw else {}
     except Exception: return jsonify({"status":"error","msg":"invalid JSON"}),400
+    payload=_header_secret(payload,request.headers)  # [A2 2026-09-02]
     result=handle_signal(payload,raw)
     # ── [REJECT-TELEMETRY 08-01] Stage 3: log every non-traded signal with its
     # reason + conditions, at this single choke point. Fully guarded — cannot

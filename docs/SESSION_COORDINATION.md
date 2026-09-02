@@ -83,6 +83,17 @@ therefore blocked on reading a file that only one machine has. It should be
 committed here at the next opportunity; until then, treat every change to it
 as a deploy with no rollback.
 
+**CORRECTION 2026-09-02 (measured in git, bot boss session):** the reporter
+IS versioned — `Sniper-System/agents/mt5_reporter/mt5_reporter.py`,
+`REPORTER_VERSION = "1.6.0"`, committed 2026-08-22 (platform v4.58, commit
+5260ce9). The warning above was true when written (08-19). What remains
+unversioned is whatever `C:\brotherbot\mt5_reporter.py` runs if it differs
+from that file — `Get-FileHash` both before trusting either. Same shape,
+found the same day: the DXY/US10Y/US30Y front-contract resolver recorded
+as "done bot-side 2026-08-20" exists in NO pushed repo (`expiration_time`
+has zero hits in brother_sniper_v7 and brother-brain-v2). If the box's
+`sniper_executor.py` carries it, it is box-only, like snapshot 1baa72a.
+
 ## Shared contracts already agreed (do not fork these)
 - Platform mirror: `learning/platform_mirror.py` (v7) / `brain/src/platform_mirror.py`
   — `pine_signal_id` join key, `rejected_by` structured, spread-at-decision,

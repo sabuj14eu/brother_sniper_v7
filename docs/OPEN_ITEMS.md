@@ -100,3 +100,34 @@ STILL OPEN on V18: the box repo's remote is dead and its snapshot lives
 only on the box. Decide later (Shyam): create a real GitHub repo for the
 v18 executor and push 1baa72a, or fold it into brother-brain-v2 — until
 then that snapshot has no off-box copy.
+
+## ROUND 3 STATUS (2026-09-02, bot boss session — this window owns the bot side)
+
+Branch note: work lands on claude/session-44nji4 first; Shyam fast-forwards
+claude/evidence-integrity-audit-35rlfa and main from it (commands in chat).
+The 2026-09-01 audit file (docs/AUDIT_2026-09-01_BOT_SIDE.md) and its
+"STEP 7 P1" list were never pushed to any branch — that list must be
+re-issued before it can be worked. The 2026-07-31 audit's P1-1..P1-5 are
+all present on this branch (verified file:line, brain OPEN_ITEMS ROUND 3).
+
+1. A2 — SHIPPED DARK: /webhook fills a MISSING payload secret from the
+   X-Webhook-Secret header (patch_webhook_header_secret.py, applied to the
+   repo bot.py). Header never overrides a body secret; handle_signal stays
+   the single check; auto-injection untouched until the log proves the
+   mirror carries the header. Tests: tests/test_round3_a2_incident.py::
+   test_a2_* (3). Box steps: docs/A2_NGINX_MIRROR_SECRET.md. Acceptance
+   log line: "[A2] secret from header (system=BSv18)".
+2. Incident posting — post_incident.py now sends BOTH incident_id and
+   public_id (append-only; works on platform <5.04 and >=5.04). Test:
+   test_incident_poster_sends_both_id_keys. INC-0001/INC-0002 re-posts
+   run from the box; not done until the platform's reply is quoted here.
+3. INC-0001 + INC-0003 are one process — see brain OPEN_ITEMS ROUND 3:
+   the reporter (Sniper-System/agents/mt5_reporter, v1.6.0) is BOTH the
+   US10Y 15m feeder and the ONLY writer of /api/v1/heartbeat/vps. The
+   discriminating query and the Windows commands are recorded there.
+4. Readiness push (platform ask #7) — post_readiness.py exists with its
+   cron line in the docstring (45 21 * * 0). Verify on the box with
+   `crontab -l | grep post_readiness`; add the line if absent. Not
+   verifiable from here.
+5. Not changed, deliberately: no trading logic, no risk number, no Pine,
+   no bias push list (naming contract waits on the platform, 5.03).

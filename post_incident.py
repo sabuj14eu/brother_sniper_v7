@@ -43,7 +43,12 @@ def _env(key, default=""):
 
 
 def build_payload(args):
+    # Both id keys, always: the platform read only public_id until its 5.04
+    # (2026-09-02) and only incident_id is what this side sent -> 404 "no
+    # incident ''" for a round trip. Sending both is append-only and works
+    # against every platform version.
     return {"kind": "incident_update", "incident_id": args.incident_id,
+            "public_id": args.incident_id,
             "root_cause": args.root_cause, "fix_ref": args.fix_ref,
             "tests_summary": args.tests, "status": args.status,
             "source": "bot session",

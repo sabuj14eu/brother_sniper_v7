@@ -141,4 +141,7 @@ all present on this branch (verified file:line, brain OPEN_ITEMS ROUND 3).
    the two are merged: single-file checkouts from the mirror branch, and
    the deploy branch's sniper_executor.py is NEVER copied over the box's.
    Merge is a deliberate round of its own (69 files; both bridge copies
-   changed the same file).
+   changed the same file). MEASURED 2026-09-02: the Windows bridge
+   (C:\Users\Administrator\sniper_executor.py) matches _macro_front 2x —
+   it is the mirror-branch bridge + the A1 patch. The deploy branch's copy
+   is a landmine until converged.

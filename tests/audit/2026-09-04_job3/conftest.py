@@ -23,6 +23,11 @@ if str(V7_ROOT) not in sys.path:
 V18_ACCOUNT = 52901228   # CLAUDE.md: v18 executor account
 V7_ACCOUNT = 52834417    # CLAUDE.md: v7 bridge account
 
+# The bridge as it was at c1618f5, BEFORE the ISO-01 patch (deployed on the box
+# 2026-09-05 00:08:15 box time; repo copy patched the same day). The ISO-01
+# reproductions run against this copy so the evidence stays re-runnable.
+PREPATCH = Path(__file__).resolve().parent / "fixtures" / "sniper_executor_prepatch_c1618f5.py"
+
 
 class FakeAccount:
     def __init__(self, login, balance=6000.0):
@@ -117,11 +122,12 @@ class FakeMT5(types.ModuleType):
         return FakeResult(order=t, volume=req.get("volume", 0.0))
 
 
-def load_v7_bridge(fake: FakeMT5, monkeypatch, secret="s3cret", path=None, expected_login=None):
+def load_v7_bridge(fake: FakeMT5, monkeypatch, secret="s3cret", path=None, expected_login=V7_ACCOUNT):
     """Import the REAL sniper_executor.py with `fake` as its MetaTrader5.
     Each call gets a fresh module (module-level init runs against `fake`).
-    `path`: an alternative copy of the file (the golden tests patch a tmp copy).
-    `expected_login`: value for V7_MT5_LOGIN (None = variable absent)."""
+    `path`: an alternative copy of the file (PREPATCH, or a tmp copy).
+    `expected_login`: value for V7_MT5_LOGIN (None = variable absent). The
+    default is the v7 account, so a patched bridge on a v7 terminal executes."""
     monkeypatch.setenv("WEBHOOK_SECRET", secret)
     if expected_login is None:
         monkeypatch.delenv("V7_MT5_LOGIN", raising=False)
@@ -147,3 +153,12 @@ def v18_terminal():
 @pytest.fixture
 def v7_terminal():
     return FakeMT5(V7_ACCOUNT)
+
+
+@pytest.fixture
+def shared_terminal():
+    """The v7 account, but the terminal also holds a v18-magic position (a
+    shared account, or a v18 order that landed here through ISO-09)."""
+    return FakeMT5(V7_ACCOUNT, positions=[
+        FakePosition(777001, "XAUUSD", magic=180000, comment="v18"),
+    ])

@@ -55,25 +55,11 @@ SYMBOL_MAP = {
 }
 
 # ── MT5 CONNECTION MANAGEMENT ───────────────────────────────────────────────
-# [ISO-01 2026-09-04] the ONE account this bridge may touch. No value = NOT
-# RUNNABLE: every route answers 503 until it is set. Never a default (ADR-004).
-V7_MT5_LOGIN = os.getenv("V7_MT5_LOGIN", "").strip()
-
-def _identity_ok(acc):
-    """The account behind the terminal must be the asserted one."""
-    if not V7_MT5_LOGIN:
-        log.critical("V7_MT5_LOGIN not set - identity unknown, refusing every order")
-        return False
-    if str(acc.login) != V7_MT5_LOGIN:
-        log.critical(f"WRONG ACCOUNT: terminal holds {acc.login}, expected {V7_MT5_LOGIN} - refusing")
-        return False
-    return True
-
 def ensure_mt5():
-    """Ensure MT5 is connected TO THE ASSERTED ACCOUNT. False = refuse."""
+    """Ensure MT5 is connected. Returns True if healthy, False if dead."""
     acc = mt5.account_info()
     if acc is not None:
-        return _identity_ok(acc)
+        return True
     log.warning("MT5 not connected — attempting initialize()")
     if not mt5.initialize(path=V7_MT5_PATH, timeout=60000):
         err = mt5.last_error()
@@ -84,7 +70,7 @@ def ensure_mt5():
         log.error("MT5 still not connected after initialize()")
         return False
     log.info(f"MT5 reconnected: account {acc.login} balance {acc.balance}")
-    return _identity_ok(acc)
+    return True
 
 # Initial connection
 if not mt5.initialize(path=V7_MT5_PATH, timeout=60000):

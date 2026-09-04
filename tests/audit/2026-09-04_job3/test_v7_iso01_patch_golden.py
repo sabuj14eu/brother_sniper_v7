@@ -1,15 +1,18 @@
 # EVIDENCE — golden fixtures for the ISO-01 patch (patch_iso01_identity.py), keep.
-"""Proves the PROPOSED patch, without applying it to the repo file: each test
-copies sniper_executor.py to a temp dir, runs patch_iso01_identity.py on the
-copy, and drives the patched bridge with a FakeMT5 terminal.
+"""Proves the ISO-01 patch two ways: (1) patch_iso01_identity.py applied to a
+temp copy of the PRE-patch bridge (what Shyam ran on the box, 2026-09-05
+00:08:15 box time), (2) the repo's sniper_executor.py, which carries the same
+change. A test also proves the script's output equals the repo file, so the
+box and the repo hold the same code modulo the box's earlier A1 patch.
 
 Golden expectation (inverse of test_repro_ISO01_*): a terminal on the wrong
 account, or no V7_MT5_LOGIN at all, means 503 on every order route and no
 order_send. The right account behaves byte-for-byte as before.
 
 Coverage for the P0 gate (docs/BROTHER_DEVELOPER.md rule 5): unit + failure
-injection + regression are here; integration on the box and human approval
-are Shyam's (deploy ceremony in patch_iso01_identity.py's docstring).
+injection + regression are here; integration on the box: /health 200 with
+account 52834417 after restart, secret still accepted, wrong secret refused
+(Shyam's paste, ledger rows box_deploy_step / box_verify).
 """
 from __future__ import annotations
 
@@ -18,7 +21,7 @@ import shutil
 
 import pytest
 
-from conftest import V18_ACCOUNT, V7_ACCOUNT, V7_ROOT, FakeMT5, load_v7_bridge
+from conftest import PREPATCH, V18_ACCOUNT, V7_ACCOUNT, V7_ROOT, FakeMT5, load_v7_bridge
 
 SIGNAL = {"secret": "s3cret", "symbol": "GOLD", "direction": "BUY",
           "lot": 0.05, "sl": 2390.0, "tp": 2420.0, "signal_id": "SS-BUY-20260904123000"}
@@ -33,9 +36,9 @@ def _patch_script():
 
 @pytest.fixture
 def patched_copy(tmp_path, capsys):
-    """A patched COPY of the repo's sniper_executor.py (repo file untouched)."""
+    """The PRE-patch bridge copied to tmp and patched by the script."""
     dst = tmp_path / "sniper_executor.py"
-    shutil.copy2(V7_ROOT / "sniper_executor.py", dst)
+    shutil.copy2(PREPATCH, dst)
     before = dst.read_text(encoding="utf-8")
     ps = _patch_script()
     ps.TGT = str(dst)
@@ -45,8 +48,25 @@ def patched_copy(tmp_path, capsys):
     after = dst.read_text(encoding="utf-8")
     assert "V7_MT5_LOGIN" in after and "V7_MT5_LOGIN" not in before
     assert list(tmp_path.glob("sniper_executor.py.bak.*")), "no backup written"
-    assert (V7_ROOT / "sniper_executor.py").read_text(encoding="utf-8") == before   # repo file untouched
+    assert PREPATCH.read_text(encoding="utf-8") == before                          # fixture untouched
     return dst
+
+
+def test_golden_script_output_equals_the_repo_file(patched_copy):
+    """The repo's sniper_executor.py IS the script's output on the pre-patch
+    file: what the box runs (modulo its A1 patch) is what the branch carries."""
+    assert patched_copy.read_text(encoding="utf-8") == (V7_ROOT / "sniper_executor.py").read_text(encoding="utf-8")
+
+
+def test_golden_ISO01_repo_bridge_refuses_wrong_account_and_missing_env(monkeypatch):
+    """Same golden expectation, on the repo file itself."""
+    term = FakeMT5(V18_ACCOUNT)
+    ex = load_v7_bridge(term, monkeypatch, expected_login=V7_ACCOUNT)
+    assert ex.app.test_client().post("/execute", json=SIGNAL).status_code == 503
+    term2 = FakeMT5(V7_ACCOUNT)
+    ex2 = load_v7_bridge(term2, monkeypatch, expected_login=None)
+    assert ex2.app.test_client().get("/health").status_code == 503
+    assert term.orders == [] and term2.orders == []
 
 
 def test_golden_ISO01_wrong_account_refuses_every_order_route(patched_copy, monkeypatch):
@@ -72,7 +92,7 @@ def test_golden_ISO01_missing_env_is_not_runnable_never_a_default(patched_copy, 
 def test_golden_ISO01_right_account_is_byte_identical_on_the_accepted_path(patched_copy, monkeypatch):
     """Regression: same order_send request as the unpatched bridge."""
     unpatched = FakeMT5(V7_ACCOUNT)
-    load_v7_bridge(unpatched, monkeypatch).app.test_client().post("/execute", json=SIGNAL)
+    load_v7_bridge(unpatched, monkeypatch, path=PREPATCH, expected_login=None).app.test_client().post("/execute", json=SIGNAL)
     patched = FakeMT5(V7_ACCOUNT)
     ex = load_v7_bridge(patched, monkeypatch, path=patched_copy, expected_login=V7_ACCOUNT)
     r = ex.app.test_client().post("/execute", json=SIGNAL)

@@ -12,7 +12,7 @@ Verdict vocabulary: PASS / FAIL / NOT RUNNABLE / UNKNOWN — never invented.
 """
 from __future__ import annotations
 
-from conftest import V18_ACCOUNT, V7_ACCOUNT, FakeMT5, FakePosition, load_v7_bridge
+from conftest import PREPATCH, V18_ACCOUNT, V7_ACCOUNT, FakeMT5, FakePosition, load_v7_bridge
 
 SIGNAL = {"secret": "s3cret", "symbol": "GOLD", "direction": "BUY",
           "lot": 0.05, "sl": 2390.0, "tp": 2420.0, "signal_id": "SS-BUY-20260904120000"}
@@ -27,8 +27,10 @@ def test_repro_ISO01_v7_bridge_executes_on_whatever_account_the_terminal_holds(v
     only log `acc.login`). The account is inferred from a file path. If the
     terminal at that path is logged into 52901228 (v18's account) the v7 arm
     trades v18's money and nothing in the code can notice.
-    VERDICT NOW: FAIL (isolation broken)."""
-    ex = load_v7_bridge(v18_terminal, monkeypatch)
+    VERDICT at c1618f5: FAIL. Runs against the PREPATCH fixture; the repo
+    file carries the ISO-01 patch since 2026-09-05 (golden fixtures in
+    test_v7_iso01_patch_golden.py)."""
+    ex = load_v7_bridge(v18_terminal, monkeypatch, path=PREPATCH)
     # the module attached by PATH only: no login was ever asserted
     assert all(c["login"] is None for c in v18_terminal.init_calls), v18_terminal.init_calls
     r = ex.app.test_client().post("/execute", json=SIGNAL)
@@ -42,8 +44,9 @@ def test_repro_ISO01_v7_bridge_executes_on_whatever_account_the_terminal_holds(v
 def test_repro_ISO01b_v7_health_reports_the_foreign_account_and_bot_client_accepts_it(v18_terminal, monkeypatch):
     """core/ic_markets.py:20-32 `connect()` sets `_login_ok=True` on ANY HTTP 200
     and only LOGS `data.get('account')` (:28). The bot never compares the
-    bridge's account to an expected one. VERDICT NOW: FAIL."""
-    ex = load_v7_bridge(v18_terminal, monkeypatch)
+    bridge's account to an expected one. VERDICT NOW: FAIL on the bot side
+    (core/ic_markets.py is unpatched); the PREPATCH bridge supplies the 200."""
+    ex = load_v7_bridge(v18_terminal, monkeypatch, path=PREPATCH)
     h = ex.app.test_client().get("/health").get_json()
     assert h["account"] == V18_ACCOUNT                            # the bridge SAYS it is on 52901228 ...
     import core.ic_markets as icm
@@ -73,21 +76,23 @@ def test_repro_ISO03_v7_bridge_ignores_account_id_and_executes_for_unknown_accou
 
 
 # ─── cross-arm management: v7 can close / modify a v18 position ────────────
-def test_repro_ISO05_v7_close_and_modify_act_on_any_ticket_including_v18_magic(v18_terminal, monkeypatch):
+def test_repro_ISO05_v7_close_and_modify_act_on_any_ticket_including_v18_magic(shared_terminal, monkeypatch):
     """FINDING ISO-05 (P0). /close (sniper_executor.py:299-323) and /modify
     (:372-386) look the ticket up with `positions_get(ticket=...)` and send the
-    order with no magic / comment / account check. On a shared terminal v7
-    closes v18's position with one POST. VERDICT NOW: FAIL."""
-    ex = load_v7_bridge(v18_terminal, monkeypatch)
+    order with no magic / comment / ownership check. A v18-magic position on
+    the v7 account (shared account, or a misrouted v18 order) is closed by one
+    POST. Still reproduces on the ISO-01-patched bridge: the identity check
+    proves the ACCOUNT, not ownership of the TICKET. VERDICT NOW: FAIL."""
+    ex = load_v7_bridge(shared_terminal, monkeypatch)
     c = ex.app.test_client()
     r = c.post("/modify", json={"secret": "s3cret", "ticket": 777001, "sl": 2395.0})
     assert r.get_json()["status"] == "ok"
     r = c.post("/close", json={"secret": "s3cret", "ticket": 777001})
     assert r.get_json()["status"] == "ok"
-    acts = [o["action"] for o in v18_terminal.orders]
+    acts = [o["action"] for o in shared_terminal.orders]
     assert acts == [FakeMT5.TRADE_ACTION_SLTP, FakeMT5.TRADE_ACTION_DEAL]
-    assert all(o["account"] == V18_ACCOUNT for o in v18_terminal.orders)
-    assert all(o.get("position") == 777001 for o in v18_terminal.orders)
+    assert all(o["account"] == V7_ACCOUNT for o in shared_terminal.orders)
+    assert all(o.get("position") == 777001 for o in shared_terminal.orders)
 
 
 # ─── Job 3 test 3: "same signal + same account = one execution" ────────────

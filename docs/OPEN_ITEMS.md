@@ -246,3 +246,19 @@ attaches fine (1.7.0 log). The four August orphans were most likely the
 Scheduled Task's instances. If that task still exists, the next reboot
 spawns a second writer again. Measure, then disable the task, keep NSSM,
 and correct the map. Commands in chat.
+
+## 2026-09-04 — Job 3 dual-MT5 isolation evidence (bot-side engineering window)
+Re-runnable reproductions under `tests/audit/2026-09-04_job3/` (run:
+`python3 -m pytest tests/audit/2026-09-04_job3 -q`; green `test_repro_*` =
+gap still present). P0s on this arm, each with a memory record in
+`brother-developer/brother_developer/memory/bugs/BUG-2026-09-04-ISO*.json`:
+ISO-01 sniper_executor.py attaches to a terminal PATH with no login and no
+identity check (:21, :64, :76) — a terminal on 52901228 takes v7 orders;
+ISO-02 core/ic_markets.py:62-66 invents balance 1000.0 / ACCOUNT_BALANCE
+when the bridge is down and bot.py:829-841 sizes on it; ISO-03 /execute
+has no account field and orders carry no magic (:178-245); ISO-05 /close
+and /modify act on any ticket (:299-323, :372-386); ISO-16 no global kill.
+Smallest proposed patch (NOT applied): assert the bridge's account against
+V7_MT5_LOGIN in ensure_mt5() — `brother-developer/docs/JOB3_ISOLATION_2026-09-04.md`
+§4. Delete this entry only when each P0 record is `resolved` with its
+golden fixture named.

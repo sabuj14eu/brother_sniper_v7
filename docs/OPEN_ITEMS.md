@@ -262,3 +262,18 @@ Smallest proposed patch (NOT applied): assert the bridge's account against
 V7_MT5_LOGIN in ensure_mt5() — `brother-developer/docs/JOB3_ISOLATION_2026-09-04.md`
 §4. Delete this entry only when each P0 record is `resolved` with its
 golden fixture named.
+
+## 2026-09-05 — ISO-01 RESOLVED on the box; platform work order for the v7 heartbeat
+ISO-01 (bridge attaches by path, no identity) is deployed and verified:
+`patch_iso01_identity.py` on `C:\Users\Administrator\sniper_executor.py`
+(backup `.bak.20260905_000815`), service env `V7_MT5_LOGIN=52834417`,
+`/health` 200 on the asserted account, marker lines 259-286 witnessed. The
+repo copy carries the same change (5b7bc70); the pre-patch bridge is kept
+under `tests/audit/2026-09-04_job3/fixtures/`. Proof: brother-developer
+ledger rows box_deploy_step / box_verify / iso01_resolved.
+NEW, from the platform (v5.25.4): the v7 heartbeat must carry
+`account_login` and `trade_mode` (from the bridge `/health`, which must
+gain `trade_mode` = MT5 `account_info().trade_mode`). Until then the desk
+shows the v7 account as CONFIGURED LABEL, not measured. Append-only,
+display-only. Next patch by risk stays ISO-02 (fabricated balance), because
+the bridge's new 503 is read by `core/ic_markets.py:62` as balance 1000.0.

@@ -117,13 +117,19 @@ class FakeMT5(types.ModuleType):
         return FakeResult(order=t, volume=req.get("volume", 0.0))
 
 
-def load_v7_bridge(fake: FakeMT5, monkeypatch, secret="s3cret"):
+def load_v7_bridge(fake: FakeMT5, monkeypatch, secret="s3cret", path=None, expected_login=None):
     """Import the REAL sniper_executor.py with `fake` as its MetaTrader5.
-    Each call gets a fresh module (module-level init runs against `fake`)."""
+    Each call gets a fresh module (module-level init runs against `fake`).
+    `path`: an alternative copy of the file (the golden tests patch a tmp copy).
+    `expected_login`: value for V7_MT5_LOGIN (None = variable absent)."""
     monkeypatch.setenv("WEBHOOK_SECRET", secret)
+    if expected_login is None:
+        monkeypatch.delenv("V7_MT5_LOGIN", raising=False)
+    else:
+        monkeypatch.setenv("V7_MT5_LOGIN", str(expected_login))
     monkeypatch.setitem(sys.modules, "MetaTrader5", fake)
-    name = f"sniper_executor_under_test_{id(fake)}"
-    spec = importlib.util.spec_from_file_location(name, V7_ROOT / "sniper_executor.py")
+    name = f"sniper_executor_under_test_{id(fake)}_{id(path)}"
+    spec = importlib.util.spec_from_file_location(name, Path(path) if path else V7_ROOT / "sniper_executor.py")
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     mod.app.config["TESTING"] = True

@@ -15,7 +15,8 @@ from __future__ import annotations
 from conftest import PREPATCH, V18_ACCOUNT, V7_ACCOUNT, FakeMT5, FakePosition, load_v7_bridge
 
 SIGNAL = {"secret": "s3cret", "symbol": "GOLD", "direction": "BUY",
-          "lot": 0.05, "sl": 2390.0, "tp": 2420.0, "signal_id": "SS-BUY-20260904120000"}
+          "lot": 0.05, "sl": 2390.0, "tp": 2420.0, "signal_id": "SS-BUY-20260904120000",
+          "account_id": str(V7_ACCOUNT)}          # ISO-03: required since 2026-09-05
 
 
 # ─── Job 3 test 1: "A cannot execute on B" ─────────────────────────────────
@@ -62,37 +63,75 @@ def test_repro_ISO01b_v7_health_reports_the_foreign_account_and_bot_client_accep
 
 
 # ─── Job 3 test 8: "unknown account = NO EXECUTION" ────────────────────────
-def test_repro_ISO03_v7_bridge_ignores_account_id_and_executes_for_unknown_account(v7_terminal, monkeypatch):
-    """FINDING ISO-03 (P0, ADR-004). The /execute contract (sniper_executor.py:178-199)
-    reads secret/symbol/direction/lot/sl/tp/signal_id. `account_id` is not a
-    field: an order tagged for an account that does not exist is executed on
-    whatever the terminal holds. VERDICT NOW: FAIL."""
-    ex = load_v7_bridge(v7_terminal, monkeypatch)
+def test_repro_ISO03_prepatch_bridge_ignored_account_id_and_placed_anonymous_orders(v7_terminal, monkeypatch):
+    """FINDING ISO-03 (P0, ADR-004) as it was at c1618f5 (PREPATCH fixture): the
+    /execute contract had no account field and the MT5 request had no magic."""
+    ex = load_v7_bridge(v7_terminal, monkeypatch, path=PREPATCH, expected_login=None)
     r = ex.app.test_client().post("/execute", json={**SIGNAL, "account_id": "99999999"})
     assert r.get_json()["status"] == "ok"
     assert v7_terminal.orders[0]["account"] == V7_ACCOUNT
-    assert "account_id" not in v7_terminal.orders[0]
-    assert "magic" not in v7_terminal.orders[0]                   # ISO-04: the order is anonymous, no magic
+    assert "magic" not in v7_terminal.orders[0]
+
+
+def test_golden_ISO03_unknown_or_missing_account_id_is_no_execution(v7_terminal, monkeypatch):
+    """FIXED 2026-09-05: the request must name the account this bridge asserts."""
+    ex = load_v7_bridge(v7_terminal, monkeypatch)
+    c = ex.app.test_client()
+    r = c.post("/execute", json={**SIGNAL, "account_id": "99999999"})
+    assert r.status_code == 403 and r.get_json()["msg"] == "account_mismatch"
+    r = c.post("/execute", json={k: v for k, v in SIGNAL.items() if k != "account_id"})
+    assert r.status_code == 400 and r.get_json()["msg"] == "no_account_id"
+    assert v7_terminal.orders == []
+
+
+def test_golden_ISO03_right_account_executes_with_v7_magic(v7_terminal, monkeypatch):
+    monkeypatch.setenv("V7_MAGIC_NUMBER", "70007")
+    ex = load_v7_bridge(v7_terminal, monkeypatch)
+    r = ex.app.test_client().post("/execute", json=SIGNAL)
+    assert r.get_json()["status"] == "ok"
+    assert v7_terminal.orders[0]["account"] == V7_ACCOUNT and v7_terminal.orders[0]["magic"] == 70007
+    rows = ex.app.test_client().get("/positions").get_json()
+    assert rows["count"] == 0 or all("magic" in p and "ours" in p for p in rows["positions"])
 
 
 # ─── cross-arm management: v7 can close / modify a v18 position ────────────
-def test_repro_ISO05_v7_close_and_modify_act_on_any_ticket_including_v18_magic(shared_terminal, monkeypatch):
-    """FINDING ISO-05 (P0). /close (sniper_executor.py:299-323) and /modify
-    (:372-386) look the ticket up with `positions_get(ticket=...)` and send the
-    order with no magic / comment / ownership check. A v18-magic position on
-    the v7 account (shared account, or a misrouted v18 order) is closed by one
-    POST. Still reproduces on the ISO-01-patched bridge: the identity check
-    proves the ACCOUNT, not ownership of the TICKET. VERDICT NOW: FAIL."""
+def test_repro_ISO05_prepatch_close_and_modify_acted_on_any_ticket(shared_terminal, monkeypatch):
+    """FINDING ISO-05 (P0) as it was at c1618f5 (PREPATCH fixture): /close and
+    /modify sent the order with no ownership check."""
+    ex = load_v7_bridge(shared_terminal, monkeypatch, path=PREPATCH, expected_login=None)
+    c = ex.app.test_client()
+    assert c.post("/modify", json={"secret": "s3cret", "ticket": 777001, "sl": 2395.0}).get_json()["status"] == "ok"
+    assert c.post("/close", json={"secret": "s3cret", "ticket": 777001}).get_json()["status"] == "ok"
+    assert [o["action"] for o in shared_terminal.orders] == [FakeMT5.TRADE_ACTION_SLTP, FakeMT5.TRADE_ACTION_DEAL]
+
+
+def test_golden_ISO05_close_and_modify_refuse_positions_that_are_not_v7s(shared_terminal, monkeypatch):
+    """FIXED 2026-09-05: a v18-magic position (magic 180000, comment 'v18') on
+    the same account is refused with not_ours; nothing is sent."""
     ex = load_v7_bridge(shared_terminal, monkeypatch)
     c = ex.app.test_client()
     r = c.post("/modify", json={"secret": "s3cret", "ticket": 777001, "sl": 2395.0})
-    assert r.get_json()["status"] == "ok"
+    assert r.status_code == 403 and r.get_json()["msg"] == "not_ours"
     r = c.post("/close", json={"secret": "s3cret", "ticket": 777001})
-    assert r.get_json()["status"] == "ok"
-    acts = [o["action"] for o in shared_terminal.orders]
-    assert acts == [FakeMT5.TRADE_ACTION_SLTP, FakeMT5.TRADE_ACTION_DEAL]
-    assert all(o["account"] == V7_ACCOUNT for o in shared_terminal.orders)
-    assert all(o.get("position") == 777001 for o in shared_terminal.orders)
+    assert r.status_code == 403 and r.get_json()["msg"] == "not_ours"
+    assert shared_terminal.orders == []
+
+
+def test_golden_ISO05_legacy_bs_comment_and_v7_magic_positions_stay_manageable(monkeypatch):
+    """Positions opened before ISO-03 carry magic 0 and a BS_ comment; new ones
+    carry V7_MAGIC. Both are v7's."""
+    monkeypatch.setenv("V7_MAGIC_NUMBER", "70007")
+    term = FakeMT5(V7_ACCOUNT, positions=[
+        FakePosition(777002, "XAUUSD", magic=0, comment="BS_ab12cd34"),
+        FakePosition(777003, "XAUUSD", magic=70007, comment="BS_ffffffff"),
+    ])
+    ex = load_v7_bridge(term, monkeypatch)
+    c = ex.app.test_client()
+    assert c.post("/modify", json={"secret": "s3cret", "ticket": 777002, "sl": 2395.0}).get_json()["status"] == "ok"
+    assert c.post("/close", json={"secret": "s3cret", "ticket": 777003}).get_json()["status"] == "ok"
+    assert len(term.orders) == 2
+    rows = ex.app.test_client().get("/positions").get_json()["positions"]
+    assert all(p["ours"] is True for p in rows)
 
 
 # ─── Job 3 test 3: "same signal + same account = one execution" ────────────

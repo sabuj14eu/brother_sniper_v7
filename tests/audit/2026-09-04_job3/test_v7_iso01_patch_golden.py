@@ -24,7 +24,8 @@ import pytest
 from conftest import PREPATCH, V18_ACCOUNT, V7_ACCOUNT, V7_ROOT, FakeMT5, load_v7_bridge
 
 SIGNAL = {"secret": "s3cret", "symbol": "GOLD", "direction": "BUY",
-          "lot": 0.05, "sl": 2390.0, "tp": 2420.0, "signal_id": "SS-BUY-20260904123000"}
+          "lot": 0.05, "sl": 2390.0, "tp": 2420.0, "signal_id": "SS-BUY-20260904123000",
+          "account_id": str(V7_ACCOUNT)}          # ISO-03: required since 2026-09-05 (ignored by the pre-patch copy)
 
 
 def _patch_script():
@@ -52,10 +53,14 @@ def patched_copy(tmp_path, capsys):
     return dst
 
 
-def test_golden_script_output_equals_the_repo_file(patched_copy):
-    """The repo's sniper_executor.py IS the script's output on the pre-patch
-    file: what the box runs (modulo its A1 patch) is what the branch carries."""
-    assert patched_copy.read_text(encoding="utf-8") == (V7_ROOT / "sniper_executor.py").read_text(encoding="utf-8")
+def test_golden_script_output_is_contained_in_the_repo_file(patched_copy):
+    """The ISO-01 script's output is the ISO-01 layer of the repo file; the repo
+    file has since gained ISO-03/05 on top (account_id check, V7_MAGIC,
+    _is_ours). Every ISO-01 line the script writes must still be present."""
+    repo = (V7_ROOT / "sniper_executor.py").read_text(encoding="utf-8")
+    for line in ("V7_MT5_LOGIN = os.getenv(\"V7_MT5_LOGIN\", \"\").strip()",
+                 "def _identity_ok(acc):", "return _identity_ok(acc)"):
+        assert line in patched_copy.read_text(encoding="utf-8") and line in repo
 
 
 def test_golden_ISO01_repo_bridge_refuses_wrong_account_and_missing_env(monkeypatch):
@@ -90,7 +95,8 @@ def test_golden_ISO01_missing_env_is_not_runnable_never_a_default(patched_copy, 
 
 
 def test_golden_ISO01_right_account_is_byte_identical_on_the_accepted_path(patched_copy, monkeypatch):
-    """Regression: same order_send request as the unpatched bridge."""
+    """Regression: the ISO-01 layer alone leaves the order_send request identical
+    to the unpatched bridge's (the repo file has since added magic, ISO-03)."""
     unpatched = FakeMT5(V7_ACCOUNT)
     load_v7_bridge(unpatched, monkeypatch, path=PREPATCH, expected_login=None).app.test_client().post("/execute", json=SIGNAL)
     patched = FakeMT5(V7_ACCOUNT)

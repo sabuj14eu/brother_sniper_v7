@@ -37,6 +37,22 @@ app = Flask(__name__)
 
 SECRET = os.getenv("WEBHOOK_SECRET", "")
 
+# [ISO-03 2026-09-05] every v7 order carries v7's magic so the reconciler, the
+# platform and /close /modify can tell v7's positions from anyone else's.
+# A tag, not a risk number; documented in .env.example.
+V7_MAGIC = int(os.getenv("V7_MAGIC_NUMBER", "70007"))
+
+
+def _is_ours(pos) -> bool:
+    """[ISO-05] a position is v7's if it carries V7_MAGIC or the legacy 'BS_' comment
+    (positions opened before ISO-03 have magic 0 and a BS_<signal> comment)."""
+    try:
+        if int(getattr(pos, "magic", 0) or 0) == V7_MAGIC:
+            return True
+    except (TypeError, ValueError):
+        pass
+    return str(getattr(pos, "comment", "") or "").startswith("BS_")
+
 # Symbol mapping: bot's name → IC Markets MT5 symbol
 SYMBOL_MAP = {
     # Metals
@@ -134,7 +150,8 @@ def positions():
             return jsonify({"count":len(pos),"positions":[
                 {"ticket":p.ticket,"symbol":p.symbol,"profit":p.profit,
                  "volume":p.volume,"type":"BUY" if p.type==0 else "SELL",
-                 "price_open":p.price_open,"price_current":p.price_current,"sl":p.sl,"tp":p.tp,"comment":p.comment}
+                 "price_open":p.price_open,"price_current":p.price_current,"sl":p.sl,"tp":p.tp,"comment":p.comment,
+                 "magic":getattr(p,"magic",None),"ours":_is_ours(p)}   # [ISO-03/05] append-only
                 for p in pos]})
         return jsonify({"count":0,"positions":[]})
     except Exception as e:
@@ -198,6 +215,16 @@ def execute():
         if data.get("secret") != SECRET:
             return jsonify({"status":"error","msg":"unauthorized"}), 403
 
+        # [ISO-03] the caller must name the account it means; it must be the one this
+        # bridge asserts (ISO-01). Missing or different = no execution (ADR-004).
+        _acct = str(data.get("account_id") or "").strip()
+        if not _acct:
+            log.error(f"[EXEC] {signal_id} no account_id in request - refusing")
+            return jsonify({"status":"error","msg":"no_account_id"}), 400
+        if _acct != V7_MT5_LOGIN:
+            log.critical(f"[EXEC] {signal_id} account_mismatch: request says {_acct}, bridge asserts {V7_MT5_LOGIN} - refusing")
+            return jsonify({"status":"error","msg":"account_mismatch"}), 403
+
         # Symbol resolution
         raw_sym = (data.get("symbol") or "").upper()
         symbol = SYMBOL_MAP.get(raw_sym, raw_sym)
@@ -253,11 +280,12 @@ def execute():
             "price": price,
             "sl": sl,
             "tp": tp,
+            "magic": V7_MAGIC,   # [ISO-03] v7's positions are no longer anonymous
             "comment": "BS_" + __import__("hashlib").md5(str(signal_id).encode()).hexdigest()[:8],
             "type_time": mt5.ORDER_TIME_GTC,
             "type_filling": mt5.ORDER_FILLING_IOC,
         }
-        log.info(f"[EXEC] {signal_id} order_send: {direction} {symbol} vol={volume} px={price} sl={sl} tp={tp}")
+        log.info(f"[EXEC] {signal_id} order_send: {direction} {symbol} vol={volume} px={price} sl={sl} tp={tp} magic={V7_MAGIC} account={_acct}")
 
         # [TELEMETRY 08-01] time the broker round-trip. Log-only: the request
         # above and order_send below are byte-identical to before.
@@ -315,6 +343,9 @@ def close():
             return jsonify({"status":"error","msg":f"position {ticket} not found"})
 
         pos = positions[0]
+        if not _is_ours(pos):   # [ISO-05] never close what v7 did not open
+            log.critical(f"[CLOSE] ticket {ticket} magic={getattr(pos,'magic',None)} comment={pos.comment!r} is not v7's - refusing")
+            return jsonify({"status":"error","msg":"not_ours"}), 403
         _req_vol = data.get("volume")
         _close_vol = pos.volume if _req_vol is None else max(0.0, min(float(_req_vol), pos.volume))
         if _close_vol <= 0:
@@ -387,6 +418,9 @@ def modify():
         if not positions:
             return jsonify({"status":"error","msg":f"position {ticket} not found"})
         pos = positions[0]
+        if not _is_ours(pos):   # [ISO-05] never re-stop what v7 did not open
+            log.critical(f"[MODIFY] ticket {ticket} magic={getattr(pos,'magic',None)} comment={pos.comment!r} is not v7's - refusing")
+            return jsonify({"status":"error","msg":"not_ours"}), 403
         new_sl = float(data.get("sl", pos.sl))
         new_tp = float(data.get("tp", pos.tp))
         req = {

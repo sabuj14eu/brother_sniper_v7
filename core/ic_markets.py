@@ -160,6 +160,9 @@ class ICMarketsClient:
                 "sl":        sl,
                 "tp":        tp,
                 "signal_id": comment,
+                # [ISO-03] the account this order is meant for; the bridge refuses any other.
+                # Empty here = the bridge answers no_account_id and nothing executes (fail closed).
+                "account_id": os.getenv("V7_MT5_LOGIN", "").strip(),
             }
             r = requests.post(self.executor_url, json=payload, timeout=15)
             data = r.json()

@@ -590,9 +590,10 @@ def _spec_worker():
 def _calibration_worker():
     _shutdown.wait(3600)
     while not _shutdown.is_set():
-        try:
-            bal=xtb.get_balance()
-        except Exception: bal=1000.0
+        bal=xtb.get_balance()   # [ISO-02] None = UNKNOWN, never a default
+        if bal is None:
+            log.warning("[CALIB] balance UNKNOWN - guard not updated, calibration skipped this cycle")
+            _shutdown.wait(CALIBRATION_HRS*3600); continue
         guard=equity_guard.check(bal,state.get("consecutive_losses",0))
         daily_dd=max(0, -equity_guard.eq.day_pnl) / max(equity_guard.eq.day_open_balance,1)
         result=recalibrate(daily_dd_pct=daily_dd)
@@ -836,8 +837,8 @@ def handle_signal(payload: dict, raw_body: bytes = b"") -> dict:
         return {"status":"skipped","msg":"margin floor / balance unreadable"}
 
     # ── PRIORITY 1: Equity Guard ──────────────────────────────────────────────
-    try: balance=xtb.get_balance()
-    except Exception: balance=1000.0
+    # [ISO-02] the MEASURED number the gate above already accepted; never re-fetched, never defaulted
+    balance=_bal_gate
     guard=equity_guard.check(balance,state.get("consecutive_losses",0))
     if not guard.allowed:
         send_telegram(f"⛔ <b>Equity Guard</b>\n{guard.block_reason}\nTier: {guard.tier_hit}")
@@ -1273,13 +1274,13 @@ _GIT_COMMIT = _deploy_commit()
 
 @app.route("/health",methods=["GET"])
 def health():
-    ok=xtb._connected and xtb._login_ok
-    try: bal=xtb.get_balance()
-    except Exception: bal=0
+    bal=xtb.get_balance()   # [ISO-02] None = UNKNOWN; health is then degraded/503 (Iron Rule 6)
+    ok=xtb._connected and xtb._login_ok and bal is not None
     guard=equity_guard.check(bal,state.get("consecutive_losses",0))
     w=load_weights()
     return jsonify({
         "status":"ok" if ok else "degraded","xtb":ok,"demo":USE_DEMO,
+        "balance":bal,"balance_state":"MEASURED" if bal is not None else "UNKNOWN",
         "paused":state.get("paused"),
         "open_trade":any_open_trade(),
         "open_trades":{k:bool(v) for k,v in (state.get("open_trades") or {}).items()},
@@ -1305,8 +1306,10 @@ def stats_route():
 @app.route("/recalibrate",methods=["POST"])
 def recal_route():
     if (request.get_json(force=True) or {}).get("secret")!=WEBHOOK_SECRET: abort(403)
-    try: bal=xtb.get_balance()
-    except Exception: bal=1000.0
+    bal=xtb.get_balance()   # [ISO-02]
+    if bal is None:
+        return jsonify({"status":"error","msg":"balance UNKNOWN - recalibration refused"}),503
+    equity_guard.update_balance(bal)
     daily_dd=max(0,-equity_guard.eq.day_pnl)/max(equity_guard.eq.day_open_balance,1)
     result=recalibrate(daily_dd_pct=daily_dd)
     send_telegram(format_calibration_telegram(result))
@@ -1315,9 +1318,9 @@ def recal_route():
 @app.route("/status",methods=["GET"])
 def status_route():
     if request.args.get("secret")!=WEBHOOK_SECRET: abort(403)
-    try: bal=xtb.get_balance()
-    except Exception: bal=0
-    return jsonify({"state":state,"equity":equity_guard.status_summary(bal),"timestamp":datetime.now().isoformat()})
+    bal=xtb.get_balance()   # [ISO-02] None -> status_summary says UNKNOWN
+    return jsonify({"state":state,"balance":bal,"balance_state":"MEASURED" if bal is not None else "UNKNOWN",
+                    "equity":equity_guard.status_summary(bal),"timestamp":datetime.now().isoformat()})
 
 @app.route("/reset",methods=["POST"])
 def reset_route():
@@ -1381,10 +1384,10 @@ def startup():
                     ("spec",_spec_worker),("calibration",_calibration_worker)]:
         threading.Thread(target=fn,daemon=True,name=name).start()
 
-    try: bal=xtb.get_balance()
-    except Exception: bal=1000.0
+    bal=xtb.get_balance()   # [ISO-02] None = UNKNOWN: guard untouched, Telegram says so
     equity_guard.update_balance(bal)
     w=load_weights(); mem=stats_summary(50)
+    _bal_txt=f"<code>${bal:.2f}</code>  Ready." if bal is not None else "<b>UNKNOWN</b> (bridge unreadable - no trades until measured)"
 
     send_telegram(
         f"🚀 <b>Brother Sniper v7 — ONLINE</b>\n"
@@ -1396,7 +1399,7 @@ def startup():
         f"Weights:    calibrated {w.get('updated_at','never')[:10]}\n"
         f"Memory:     {mem.get('trades',0)} trades  WR={mem.get('win_rate',0):.0f}%  "
         f"EV=${mem.get('expectancy',0):.2f}\n"
-        f"Balance:    <code>${bal:.2f}</code>  Ready."
+        f"Balance:    {_bal_txt}"
     )
     # ── ORPHAN CHECK: if state has open_trade but MT5 doesn't, recover via /history ──
     try:

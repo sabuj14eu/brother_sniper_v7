@@ -36,6 +36,9 @@ class EquityGuard:
         import dataclasses; return dataclasses.asdict(self.eq)
 
     def update_balance(self,bal):
+        # [ISO-02] UNKNOWN balance never moves peak/day/week state.
+        if bal is None:
+            log.warning("[EQ] balance UNKNOWN - guard state not updated"); return
         today=date.today().isoformat(); wk=datetime.now(timezone.utc).strftime("%Y-W%W")
         if self.eq.day_date!=today: self.eq.day_open_balance=bal; self.eq.day_pnl=0.0; self.eq.day_date=today
         if self.eq.week_num!=wk: self.eq.week_open_balance=bal; self.eq.week_pnl=0.0; self.eq.week_num=wk
@@ -48,6 +51,9 @@ class EquityGuard:
         self.eq.trade_history=self.eq.trade_history[-50:]
 
     def check(self,bal,consecutive_losses,max_losses=3):
+        # [ISO-02 2026-09-05] UNKNOWN balance = blocked, before any state is touched.
+        if bal is None:
+            return self._block("unknown",0,0,0,"balance UNKNOWN - bridge unreadable, no execution")
         self.update_balance(bal); eq=self.eq
         daily_limit=eq.day_open_balance*DAILY_DD_LIMIT_PCT
         weekly_limit=eq.week_open_balance*WEEKLY_DD_LIMIT_PCT
@@ -86,6 +92,12 @@ class EquityGuard:
         return 0.0
 
     def status_summary(self,bal):
+        if bal is None:
+            eq=self.eq
+            return ("Equity: UNKNOWN (bridge unreadable)\n"
+                    +"Peak: $"+str(round(eq.peak_balance,2))+" (last measured)\n"
+                    +"Day PnL: UNKNOWN\nWeek PnL: UNKNOWN\nRisk: 0% per trade (no execution)\n"
+                    +"Stopped: "+("YES" if eq.hard_stopped else "No"))
         self.update_balance(bal); eq=self.eq
         epct=round(bal/eq.peak_balance*100,1) if eq.peak_balance else 100
         risk=self._dynamic_risk(epct)

@@ -56,14 +56,27 @@ class ICMarketsClient:
             self._login_ok  = False
 
     def get_balance(self):
+        """Measured balance as float, or None = UNKNOWN.
+
+        [ISO-02 2026-09-05] Never a number the broker did not say. The bridge's
+        own 503 ("mt5 disconnected"), a 200 without a balance field, and any
+        exception are all UNKNOWN. Every caller treats None as NO EXECUTION and
+        NO GUARD UPDATE (Freshness Law). ACCOUNT_BALANCE in .env is dead config.
+        """
         try:
             url = self.executor_url.replace("/execute","/health")
             r = requests.get(url, timeout=5)
-            return float(r.json().get("balance", 1000.0))
+            if r.status_code != 200:
+                log.warning(f"[CT] get_balance: bridge answered {r.status_code} - balance UNKNOWN")
+                return None
+            bal = r.json().get("balance")
+            if bal is None:
+                log.warning("[CT] get_balance: 200 without a balance field - balance UNKNOWN")
+                return None
+            return float(bal)
         except Exception as e:
-            fb = float(os.getenv("ACCOUNT_BALANCE","6000.0"))
-            log.warning(f"[CT] get_balance FAILED ({type(e).__name__}) - using conservative fallback {fb}")
-            return fb
+            log.warning(f"[CT] get_balance FAILED ({type(e).__name__}) - balance UNKNOWN, no fallback")
+            return None
 
     def get_open_trades(self): return []
     def get_closed_trades(self, hours_back=48): return []

@@ -90,15 +90,41 @@ def test_contract_the_margin_gate_already_handles_none():
     assert "_bal_gate is None or _bal_gate < MARGIN_FLOOR" in src
 
 
-# ── SOURCE PIN: the lines the patch removes (fails when it lands) ─────────
-
-def test_pin_pre_patch_fallback_lines_still_present():
-    """Delete this test in the ISO-02 patch commit; its failure is the proof
-    the fabrication paths are gone. Lines at c1618f5: core/ic_markets.py:62,
-    :64; bot.py:840, :595, :1278, :1309, :1319, :1385."""
+# ── GOLDEN PIN (patch landed 2026-09-05): the fabrication lines are GONE ──
+def test_golden_fabrication_lines_are_gone():
+    """Inverse of the pre-patch pin (its text is in git history). At c1618f5 the
+    fallbacks lived at core/ic_markets.py:62, :64 and bot.py:840, :595, :1278,
+    :1309, :1319, :1385. None of them may come back."""
     ic = (ROOT / "core" / "ic_markets.py").read_text()
     bot = (ROOT / "bot.py").read_text()
-    assert 'get("balance", 1000.0)' in ic
-    assert 'os.getenv("ACCOUNT_BALANCE","6000.0")' in ic
-    assert bot.count("except Exception: balance=1000.0") == 1
-    assert bot.count("except Exception: bal=1000.0") >= 3
+    assert 'get("balance", 1000.0)' not in ic
+    assert 'os.getenv("ACCOUNT_BALANCE"' not in ic
+    assert "except Exception: balance=1000.0" not in bot
+    assert "except Exception: bal=1000.0" not in bot
+    assert "except Exception: bal=0" not in bot
+    assert "balance=_bal_gate" in bot                       # the guard reuses the gate's measured number
+
+
+# ── CONTRACT ON THE REAL CLIENT (was: on proposed_get_balance.py) ─────────
+def _real_client(monkeypatch, http):
+    import core.ic_markets as icm
+    monkeypatch.setenv("EXECUTOR_URL", "http://bridge/execute")
+    monkeypatch.setattr(icm, "requests", http)
+    return icm.ICMarketsClient()
+
+
+def test_golden_real_client_503_is_unknown(monkeypatch):
+    assert _real_client(monkeypatch, _http(503, {"status": "error", "msg": "mt5 disconnected"})).get_balance() is None
+
+
+def test_golden_real_client_exception_is_unknown_never_env(monkeypatch):
+    monkeypatch.setenv("ACCOUNT_BALANCE", "6000.0")
+    assert _real_client(monkeypatch, _http(raise_exc=ConnectionError("down"))).get_balance() is None
+
+
+def test_golden_real_client_200_without_balance_is_unknown(monkeypatch):
+    assert _real_client(monkeypatch, _http(200, {"status": "ok"})).get_balance() is None
+
+
+def test_golden_real_client_200_with_balance_is_the_balance(monkeypatch):
+    assert _real_client(monkeypatch, _http(200, {"status": "ok", "balance": 11639.38, "account": 52834417})).get_balance() == 11639.38

@@ -52,36 +52,49 @@ def _blocked_inputs():
                 custom_score=None, signal_id="SS-SELL-TEST")
 
 
-def test_repro_ISO24_llm_vote_reverses_a_rule_block(monkeypatch):
-    """FINDING ISO-24 (P0). With the tiebreak answering (True, 80, ...), a
-    signal the rules blocked becomes passed=True and the reason starts with
-    "AI OVERRIDE". VERDICT NOW: FAIL (an LLM widens risk in the decision path)."""
+def test_golden_ISO24_a_go_vote_never_flips_a_rule_block(monkeypatch):
+    """FINDING ISO-24 (P0), FIXED 2026-09-05. At 5369fa3 a (True, >=60) vote
+    set passed=True and the reason began "AI OVERRIDE" (reproduced in this
+    test's git history). Now the vote is recorded in breakdown["deepseek"]
+    with shadow_only=True and the block stands, whatever the confidence."""
     calls = []
     monkeypatch.setattr(deepseek_vote, "deepseek_tiebreak", lambda ctx: calls.append(ctx) or None)
     base = ai_filter.score_signal(**_blocked_inputs())
-    if base.passed:
-        pytest.skip("NOT RUNNABLE: the chosen inputs are not blocked by the rules on this weight file")
-    assert "news" not in base.reason
+    assert base.passed is False and "news" not in base.reason
+    assert len(calls) == 1                                   # the vote is still asked (evidence)
 
-    monkeypatch.setattr(deepseek_vote, "deepseek_tiebreak", lambda ctx: (True, 80, "[test-llm] go"))
-    over = ai_filter.score_signal(**_blocked_inputs())
-    assert over.passed is True
-    assert over.reason.startswith("AI OVERRIDE")
-    assert over.breakdown["deepseek"]["confidence"] == 80
-
-
-def test_holds_llm_cannot_override_a_news_flagged_block(monkeypatch):
-    """ai_filter.py:102-105 [F6] — a news-flagged block is never overridden. PASS."""
-    monkeypatch.setattr(deepseek_vote, "deepseek_tiebreak", lambda ctx: (True, 99, "[test-llm] go"))
-    r = ai_filter.score_signal(**{**_blocked_inputs(), "news_minutes": 10})
-    assert r.passed is False and "news" in r.reason
+    for conf in (60, 80, 100):
+        monkeypatch.setattr(deepseek_vote, "deepseek_tiebreak", lambda ctx, c=conf: (True, c, "[test-llm] go"))
+        r = ai_filter.score_signal(**_blocked_inputs())
+        assert r.passed is False, conf
+        assert "AI OVERRIDE" not in r.reason and "recorded, not applied" in r.reason
+        assert r.breakdown["deepseek"] == {"take": True, "confidence": conf, "reason": "[test-llm] go", "shadow_only": True}
 
 
-def test_holds_low_confidence_vote_does_not_override(monkeypatch):
-    """ai_filter.py:112 — confidence < 60 keeps the block. PASS."""
-    monkeypatch.setattr(deepseek_vote, "deepseek_tiebreak", lambda ctx: (True, 59, "[test-llm] meh"))
+def test_golden_ISO24_a_passing_score_is_not_asked_and_not_touched(monkeypatch):
+    """The vote is only asked on a block; a rule pass never consults the model."""
+    calls = []
+    monkeypatch.setattr(deepseek_vote, "deepseek_tiebreak", lambda ctx: calls.append(ctx) or (False, 99, "no"))
+    monkeypatch.setattr(ai_filter, "_current_threshold", 1)
     r = ai_filter.score_signal(**_blocked_inputs())
-    assert r.passed is False and "AI agreed block" in r.reason
+    assert r.passed is True and calls == [] and "deepseek" not in r.breakdown
+
+
+def test_holds_llm_is_not_asked_on_a_news_flagged_block(monkeypatch):
+    """ai_filter.py [F6] — a news-flagged block never consults the model. PASS."""
+    calls = []
+    monkeypatch.setattr(deepseek_vote, "deepseek_tiebreak", lambda ctx: calls.append(ctx) or (True, 99, "go"))
+    r = ai_filter.score_signal(**{**_blocked_inputs(), "news_minutes": 10})
+    assert r.passed is False and "news" in r.reason and calls == []
+
+
+def test_golden_ISO24_vote_hook_error_keeps_the_block(monkeypatch):
+    """Failure injection: the provider raising leaves the rule verdict intact."""
+    def boom(ctx):
+        raise RuntimeError("provider down")
+    monkeypatch.setattr(deepseek_vote, "deepseek_tiebreak", boom)
+    r = ai_filter.score_signal(**_blocked_inputs())
+    assert r.passed is False and "deepseek" not in r.breakdown
 
 
 def test_repro_ISO24b_no_api_key_means_no_override_today_but_the_path_is_live(monkeypatch):

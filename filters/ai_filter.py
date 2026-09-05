@@ -101,8 +101,13 @@ def score_signal(symbol,direction,entry,sl_price,tp,regime_result=None,atr=None,
     # [F6 2026-07-02] never let the AI override a news-flagged block — trading
     # into a high-impact window on LLM confidence is how "soft filter" becomes
     # "no filter". Session/RR blocks remain overridable as designed.
+    # [ISO-24 2026-09-05] The model vote is SHADOW EVIDENCE ONLY. It is asked on a
+    # rule block (so the journal can grade it) and recorded in breakdown["deepseek"],
+    # but it can never turn `passed` from False to True. "No LLM in the decision
+    # path, ever" (V7_SELF_DEPENDENCE_PLAN); a model may remove risk, never add it.
+    # The override branch that used to live here is preserved in git history.
     if not passed and "news" in flags:
-        log.info(f"[FILTER] {symbol} {direction}: news-flagged block — AI override disabled")
+        log.info(f"[FILTER] {symbol} {direction}: news-flagged block — no model vote asked")
     elif not passed:
         try:
             from filters.deepseek_vote import deepseek_tiebreak
@@ -112,15 +117,10 @@ def score_signal(symbol,direction,entry,sl_price,tp,regime_result=None,atr=None,
             _v=deepseek_tiebreak(_ctx)
             if _v is not None:
                 _take,_conf,_dsreason=_v
-                breakdown["deepseek"]={"take":_take,"confidence":_conf,"reason":_dsreason}
-                if _take and _conf>=60:
-                    passed=True
-                    reason=f"AI OVERRIDE (conf {_conf}): {_dsreason} | was: {reason}"
-                    log.info(f"[FILTER] {symbol} {direction}: DeepSeek OVERRODE block conf={_conf}")
-                else:
-                    reason=f"{reason} | AI agreed block (conf {_conf})"
+                breakdown["deepseek"]={"take":_take,"confidence":_conf,"reason":_dsreason,"shadow_only":True}
+                reason=f"{reason} | model vote recorded, not applied (take={_take} conf {_conf})"
         except Exception as _e:
-            log.warning(f"[FILTER] DeepSeek hook error: {_e}")
+            log.warning(f"[FILTER] model vote hook error (non-fatal, block stands): {_e}")
     return FilterResult(score=final,passed=passed,breakdown=breakdown,reason=reason,session=session,recommended=recommended,threshold=threshold,regime=regime_name,weights_age=w_age)
 
 def _get_session(h=None):

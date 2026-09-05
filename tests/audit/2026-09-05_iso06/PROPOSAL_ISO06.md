@@ -15,7 +15,7 @@ while one bot process talks to one bridge and never restarts mid-flight; the bri
 is the last thing before the broker, trusts every POST. Iron Rule 6: only tickets tell the
 truth, and a duplicate ticket is a real position with real risk.
 
-**AFTER** (`fixtures/proposed_sniper_executor_iso06.py`, hunks in `proposal_hunks.py`) —
+**AFTER** (`fixtures/proposed_sniper_executor_iso06.py`, hunks in `proposal_hunks_iso06.py`) —
 - a small JSON store `V7_SEEN_FILE` (default beside the service file, TTL 6h like v18's
   `signal_ids.json`), keyed `"<account>:<signal_id>"`, atomic write, lock-guarded;
 - after every existing validation and immediately BEFORE `order_send`: no `signal_id` → 400

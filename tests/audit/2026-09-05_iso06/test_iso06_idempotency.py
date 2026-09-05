@@ -12,7 +12,7 @@ for p in (str(JOB3), str(HERE)):
     if p not in sys.path:
         sys.path.insert(0, p)
 from conftest import V7_ACCOUNT, FakeMT5, FakeResult, load_v7_bridge  # noqa: E402
-import proposal_hunks  # noqa: E402
+import proposal_hunks_iso06 as proposal_hunks  # noqa: E402
 
 PROPOSED = HERE / "fixtures" / "proposed_sniper_executor_iso06.py"
 LIVE = HERE.parents[2] / "sniper_executor.py"

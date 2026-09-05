@@ -78,6 +78,29 @@ class ICMarketsClient:
             log.warning(f"[CT] get_balance FAILED ({type(e).__name__}) - balance UNKNOWN, no fallback")
             return None
 
+    def get_account(self):
+        """Measured account identity from the bridge's /health, or None = UNKNOWN.
+
+        [HEARTBEAT WORK ORDER 2026-09-05] display-only; the ISO-02 shape: a
+        non-200, a 200 without an account, or any exception is None and the
+        heartbeat then carries NO account keys rather than a guessed one.
+        Returns {"login", "trade_mode", "balance"}; trade_mode is MT5's
+        account_info().trade_mode (0 demo, 1 contest, 2 real) or None when the
+        bridge predates the field.
+        """
+        try:
+            url = self.executor_url.replace("/execute","/health")
+            r = requests.get(url, timeout=5)
+            if r.status_code != 200:
+                return None
+            j = r.json() or {}
+            if j.get("account") is None:
+                return None
+            return {"login": j.get("account"), "trade_mode": j.get("trade_mode"), "balance": j.get("balance")}
+        except Exception as e:
+            log.warning(f"[CT] get_account FAILED ({type(e).__name__}) - account UNKNOWN")
+            return None
+
     def get_open_trades(self): return []
     def get_closed_trades(self, hours_back=48): return []
 

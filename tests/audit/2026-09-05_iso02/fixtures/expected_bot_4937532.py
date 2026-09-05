@@ -428,10 +428,8 @@ def _monitor():
         # so the desk can tell "v7 quiet" apart from "v7 down" (Iron Rule 6).
         try:
             from core.v7_status import update_heartbeat
-            _acct=xtb.get_account() or {}   # [HEARTBEAT WORK ORDER 2026-09-05] None = UNKNOWN -> keys dropped
             update_heartbeat(state, equity_guard.to_dict(), bridge_ok=_bridge_ok,
-                             symbols_enabled=ALLOWED_SYMBOLS, reconciliation=None,
-                             account_login=_acct.get("login"), trade_mode=_acct.get("trade_mode"))
+                             symbols_enabled=ALLOWED_SYMBOLS, reconciliation=None)
         except Exception as _he:
             log.warning(f"[V7-STATUS] heartbeat skipped (non-fatal): {_he}")
         if not any_open_trade(): continue

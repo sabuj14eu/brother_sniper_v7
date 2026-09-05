@@ -16,10 +16,12 @@ REPO = HERE.parents[2]
 SCRIPT = REPO / "patch_iso02_balance_unknown.py"
 PRE = HERE / "fixtures" / "prepatch_a3640d6"
 RELS = ("core/ic_markets.py", "risk/equity_guard.py", "bot.py")
+# The repo files keep moving (f400347 ISO-03, the heartbeat work order); the gate
+# artefact is pinned to the ISO-02 commit itself, so expected == the tree at 4937532.
 EXPECTED = {
-    "bot.py": REPO / "bot.py",                                  # unchanged since 4937532
-    "risk/equity_guard.py": REPO / "risk" / "equity_guard.py",  # unchanged since 4937532
-    "core/ic_markets.py": HERE / "fixtures" / "expected_core_ic_markets_4937532.py",  # f400347 added ISO-03 after
+    "bot.py": HERE / "fixtures" / "expected_bot_4937532.py",
+    "risk/equity_guard.py": HERE / "fixtures" / "expected_risk_equity_guard_4937532.py",
+    "core/ic_markets.py": HERE / "fixtures" / "expected_core_ic_markets_4937532.py",
 }
 
 

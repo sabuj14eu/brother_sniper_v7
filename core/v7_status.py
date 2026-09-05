@@ -176,7 +176,8 @@ def latest_verdicts() -> dict:
 
 def build_heartbeat(state: dict, guard: dict | None = None, *,
                     bridge_ok=None, balance=None, equity=None,
-                    symbols_enabled=None, reconciliation=None) -> dict:
+                    symbols_enabled=None, reconciliation=None,
+                    account_login=None, trade_mode=None) -> dict:
     """One v7_heartbeat record from the live state dict (+ equity guard dict)."""
     st, gd = state or {}, guard or {}
     slots = {}
@@ -207,6 +208,11 @@ def build_heartbeat(state: dict, guard: dict | None = None, *,
         "balance": balance,
         "equity": equity,
         "bridge_ok": bridge_ok,
+        # [HEARTBEAT WORK ORDER 2026-09-05] append-only: the MEASURED login behind
+        # the bridge (asserted since ISO-01) and MT5 trade_mode (0 demo, 1 contest,
+        # 2 real). None = UNKNOWN and the key is dropped below, never guessed.
+        "account_login": account_login,
+        "trade_mode": trade_mode,
         "open_slots": slots,
         "symbols_enabled": sorted(symbols_enabled) if symbols_enabled else None,
         "last_decision_ts": (_decisions[-1].get("ts") if _decisions else None),

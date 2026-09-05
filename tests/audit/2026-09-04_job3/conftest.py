@@ -81,11 +81,19 @@ class FakeMT5(types.ModuleType):
         self.init_calls: list[dict] = []
         self._next_ticket = 900001
         self.dead = False                     # simulate a dropped terminal
+        self.shutdown_calls = 0
+        self.honour_login = False
 
     # --- terminal link ---
     def initialize(self, path=None, login=None, password=None, server=None, timeout=None):
         self.init_calls.append({"path": path, "login": login, "server": server})
+        if self.honour_login and login is not None and int(login) != self.account.login:
+            return False
         return True
+
+    def shutdown(self):
+        self.shutdown_calls += 1
+        self.dead = True
 
     def account_info(self):
         return None if self.dead else self.account

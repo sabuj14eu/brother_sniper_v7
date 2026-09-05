@@ -43,6 +43,40 @@ SECRET = os.getenv("WEBHOOK_SECRET", "")
 V7_MAGIC = int(os.getenv("V7_MAGIC_NUMBER", "70007"))
 
 
+# [ISO-16 2026-09-05, ADR-008] GLOBAL emergency stop: ONE file both executors on
+# this box read before every new order. Present = STOP, absent = CLEAR, unreadable
+# = UNKNOWN (treated as STOP). Identical logic lives in the v18 executor
+# (executor_ic_markets/src/utils/global_stop.py); keep the two in step.
+def _global_stop_path():
+    p = (os.getenv("GLOBAL_STOP_FILE") or "").strip()
+    if p:
+        return p
+    return r"C:\brotherbot\GLOBAL_STOP" if os.name == "nt" else "/var/lib/brotherbot/GLOBAL_STOP"
+
+
+def _global_stop_state():
+    try:
+        return "STOP" if os.path.exists(_global_stop_path()) else "CLEAR"
+    except Exception:
+        return "UNKNOWN"
+
+
+def _global_stop_engage(reason, who="sniper_executor_v7"):
+    p = _global_stop_path()
+    try:
+        d = os.path.dirname(p)
+        if d:
+            os.makedirs(d, exist_ok=True)
+        with open(p, "a", encoding="utf-8") as f:
+            f.write(f"{datetime.utcnow().isoformat()}Z {who}: {reason}\n")
+    except Exception as e:
+        log.error(f"[GLOBAL-STOP] could not write {p}: {e}")
+    return p
+
+
+ADMIN_HALT_TOKEN = os.getenv("ADMIN_HALT_TOKEN", "").strip()
+
+
 def _is_ours(pos) -> bool:
     """[ISO-05] a position is v7's if it carries V7_MAGIC or the legacy 'BS_' comment
     (positions opened before ISO-03 have magic 0 and a BS_<signal> comment)."""
@@ -135,7 +169,10 @@ def health():
         return jsonify({"status":"error","msg":"mt5 disconnected"}), 503
     acc = mt5.account_info()
     if acc:
-        return jsonify({"status":"ok","account":acc.login,"balance":acc.balance,"equity":acc.equity,"git_commit":_GIT_COMMIT,"service_version":"sniper-executor-v7"})
+        return jsonify({"status":"ok","account":acc.login,"balance":acc.balance,"equity":acc.equity,
+                        "trade_mode":getattr(acc,"trade_mode",None),          # heartbeat work order item 1
+                        "global_stop":_global_stop_state(),                    # [ISO-16]
+                        "git_commit":_GIT_COMMIT,"service_version":"sniper-executor-v7"})
     return jsonify({"status":"error","msg":"no account info"}), 503
 
 @app.route("/positions", methods=["GET"])
@@ -224,6 +261,12 @@ def execute():
         if _acct != V7_MT5_LOGIN:
             log.critical(f"[EXEC] {signal_id} account_mismatch: request says {_acct}, bridge asserts {V7_MT5_LOGIN} - refusing")
             return jsonify({"status":"error","msg":"account_mismatch"}), 403
+
+        # [ISO-16] the GLOBAL stop refuses every new order on this box (UNKNOWN = STOP)
+        _gs = _global_stop_state()
+        if _gs != "CLEAR":
+            log.critical(f"[EXEC] {signal_id} GLOBAL STOP {_gs} ({_global_stop_path()}) - refusing")
+            return jsonify({"status":"error","msg":"global_stop","state":_gs}), 503
 
         # Symbol resolution
         raw_sym = (data.get("symbol") or "").upper()
@@ -440,6 +483,32 @@ def modify():
     except Exception as e:
         log.error(f"[MODIFY] error: {e}")
         return jsonify({"status":"error","msg":str(e)}), 500
+
+# [ISO-16] panic button with the same contract as the v18 executor's halt_admin.py:
+# X-Admin-Token header, 503 when no token is configured, 401 when wrong. Engaging
+# writes the shared witness, so it stops the v18 executor's new orders as well.
+@app.route("/admin/halt", methods=["POST"])
+def admin_halt():
+    if not ADMIN_HALT_TOKEN:
+        return jsonify({"status":"error","msg":"ADMIN_HALT_TOKEN not configured"}), 503
+    if not __import__("secrets").compare_digest(request.headers.get("X-Admin-Token", ""), ADMIN_HALT_TOKEN):
+        return jsonify({"status":"error","msg":"bad admin token"}), 401
+    data = request.get_json(silent=True) or {}
+    reason = str(data.get("reason") or "manual_admin_halt")
+    p = _global_stop_engage(reason)
+    log.critical(f"[GLOBAL-STOP] engaged by admin: {reason} -> {p}")
+    return jsonify({"status":"halted","reason":reason,"global_stop":_global_stop_state(),"file":p})
+
+
+@app.route("/admin/status", methods=["GET"])
+def admin_status():
+    if not ADMIN_HALT_TOKEN:
+        return jsonify({"status":"error","msg":"ADMIN_HALT_TOKEN not configured"}), 503
+    if not __import__("secrets").compare_digest(request.headers.get("X-Admin-Token", ""), ADMIN_HALT_TOKEN):
+        return jsonify({"status":"error","msg":"bad admin token"}), 401
+    return jsonify({"global_stop":_global_stop_state(),"file":_global_stop_path(),
+                    "asserted_login":V7_MT5_LOGIN,"magic":V7_MAGIC})
+
 
 if __name__ == "__main__":
     log.info("Brother Sniper Executor v3 starting on 0.0.0.0:5001")

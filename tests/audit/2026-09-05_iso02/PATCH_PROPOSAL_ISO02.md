@@ -72,6 +72,17 @@ Replay: same signals through old/new must show `BEHAVIOR CHANGED` only when the 
 --- a/risk/equity_guard.py
 +++ b/risk/equity_guard.py
 @@ def check(self,bal,consecutive_losses,max_losses=3):
+-        self.update_balance(bal); eq=self.eq
++        # W2-02: the None guard must run BEFORE update_balance — update_balance(None)
++        # raises TypeError at `bal-self.eq.day_open_balance` (risk/equity_guard.py:42)
++        # and the guard would crash instead of blocking. Fail closed, with the
++        # existing _block signature (kind, daily_used, weekly_used, equity_pct, reason).
 +        if bal is None:
-+            return GuardResult(allowed=False, block_reason="balance UNKNOWN — bridge unreadable", tier_hit="UNKNOWN")
++            return self._block("unknown", 0, 0, 0, "balance UNKNOWN — bridge unreadable, no execution")
++        self.update_balance(bal); eq=self.eq
+```
+W2-02 (window 3): the earlier hunk placed the guard after `update_balance` and used a
+`GuardResult(...)` constructor that does not exist here; both corrected above. Pinned by
+`test_iso02_equity_guard_none.py` in this directory.
+```
 ```
